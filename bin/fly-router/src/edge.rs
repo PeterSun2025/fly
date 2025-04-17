@@ -20,6 +20,8 @@ use std::cmp::min;
 use std::fmt::Formatter;
 // 引入标准库中的时间模块
 use std::time::Duration;
+// 引入标准库中的 hash 模块，用于哈希操作
+use std::hash::{Hash, Hasher};
 
 // 定义一个可克隆、可调试、可序列化和反序列化的边状态结构体
 #[derive(Clone, Debug, Default, serde_derive::Serialize, serde_derive::Deserialize)]
@@ -310,6 +312,14 @@ impl Edge {
 
         // 调用内部更新方法
         self.update_internal(chain_data, decimals, price, path_warming_amounts);
+    }
+}
+
+impl Hash for Edge {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // 使用边的唯一标识符、输出铸币公钥
+        self.unique_id().hash(state);
+        self.output_mint.hash(state);
     }
 }
 

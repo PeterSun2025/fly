@@ -146,7 +146,7 @@ pub async fn get_compressed_program_account_rpc(
 
     // use getGPA compressed if available
     for program_id in filters.iter() {
-        info!("gPA for {}", program_id);
+        info!("gPA compressed for {}", program_id);
 
         let result = rpc_client
             .send::<OptionalContext<Vec<RpcKeyedCompressedAccount>>>(

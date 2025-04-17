@@ -30,6 +30,7 @@ pub struct TlsConfig {
 
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
 pub struct Config {
+    pub ring: RingConfig,
     pub routing: RoutingConfig,
     pub server: ServerConfig,
     pub metrics: MetricsConfig,
@@ -38,8 +39,8 @@ pub struct Config {
     pub orca: DexConfig,
     pub cropper: DexConfig,
   //  pub openbook_v2: DexConfig,
-  //  pub raydium_cp: DexConfig,
-  //  pub raydium: DexConfig,
+    pub raydium_cp: DexConfig,
+    pub raydium: DexConfig,
   //  pub saber: DexConfig,
   //  pub invariant: DexConfig,
   //  pub infinity: InfinityConfig,
@@ -212,4 +213,12 @@ pub fn string_or_env(value_or_env: String) -> String {
     };
 
     value
+}
+
+
+#[derive(Clone, Debug, Default, serde_derive::Deserialize)]
+pub struct RingConfig {
+    pub ring_mints: Option<Vec<String>>,
+    pub max_path_length: Option<usize>,
+    
 }

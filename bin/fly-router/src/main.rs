@@ -1,8 +1,4 @@
-use crate::edge_updater::{spawn_updater_job, Dex};
-use crate::util::tokio_spawn;
-use crate::source::mint_accounts_source::{request_mint_metadata, Token};
-use crate::token_cache::{Decimals, TokenCache};
-use crate::hot_mints::HotMintsCache;
+
 
 use std::env;
 use std::process::exit;
@@ -14,6 +10,12 @@ use tokio::task::JoinHandle;
 
 use anyhow::Result;
 use num_cpus;
+
+use crate::edge_updater::{spawn_updater_job, Dex};
+use crate::util::tokio_spawn;
+use crate::source::mint_accounts_source::{request_mint_metadata, Token};
+use crate::token_cache::{Decimals, TokenCache};
+use crate::hot_mints::HotMintsCache;
 
 use mango_feeds_connector::chain_data::ChainData;
 use mango_feeds_connector::SlotUpdate;
@@ -48,6 +50,10 @@ use dex_orca::OrcaDex;
 mod debug_tools;
 mod dex;
 pub mod edge;
+pub mod mock;
+pub mod routing_types;
+mod ring_executor;
+mod ring;
 mod edge_updater;
 mod slot_watcher;
 pub mod prelude;
@@ -58,6 +64,8 @@ mod hot_mints;
 mod source;
 mod syscallstubs;
 mod token_cache;
+
+pub mod graph;
 
 
 
@@ -130,6 +138,9 @@ async fn main() -> Result<()> {
         async_channel::unbounded::<FeedMetadata>();
     let (slot_sender, slot_receiver) = async_channel::unbounded::<SlotUpdate>();
     let (account_update_sender, _) = broadcast::channel(4 * 1024 * 1024); // TODO this is huge, but init snapshot will completely spam this
+
+    let (edge_price_sender  , edge_price_updates) =
+    async_channel::unbounded::<Arc<Edge>>();
 
     let chain_data = Arc::new(RwLock::new(ChainData::new()));
     start_chaindata_updating(
@@ -237,22 +248,22 @@ async fn main() -> Result<()> {
         //     config.saber.take_all_mints,
         //     &config.saber.mints
         // ),
-        // dex::generic::build_dex!(
-        //     dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),).await?,
-        //     &mango_data,
-        //     config.raydium_cp.enabled,
-        //     config.raydium_cp.add_mango_tokens,
-        //     config.raydium_cp.take_all_mints,
-        //     &config.raydium_cp.mints
-        // ),
-        // dex::generic::build_dex!(
-        //     dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),).await?,
-        //     &mango_data,
-        //     config.raydium.enabled,
-        //     config.raydium.add_mango_tokens,
-        //     config.raydium.take_all_mints,
-        //     &config.raydium.mints
-        // ),
+        dex::generic::build_dex!(
+            dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),).await?,
+            &mango_data,
+            config.raydium_cp.enabled,
+            config.raydium_cp.add_mango_tokens,
+            config.raydium_cp.take_all_mints,
+            &config.raydium_cp.mints
+        ),
+        dex::generic::build_dex!(
+            dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),).await?,
+            &mango_data,
+            config.raydium.enabled,
+            config.raydium.add_mango_tokens,
+            config.raydium.take_all_mints,
+            &config.raydium.mints
+        ),
         // dex::generic::build_dex!(
         //     dex_openbook_v2::OpenbookV2Dex::initialize(&mut router_rpc, HashMap::new(),).await?,
         //     &mango_data,
@@ -290,7 +301,11 @@ async fn main() -> Result<()> {
         edges.iter().map(|x| x.output_mint)
     )
     .collect();
-    info!("Using {} mints", mints.len(),);
+    info!("Using {} mints,{} edges.", mints.len(),edges.len());
+
+    for edge in edges.iter() {
+        info!("Edge: {:?}  || desc:{} ", edge.unique_id(), edge.desc());
+    }
 
     let token_cache = {
         let mint_metadata = request_mint_metadata(
@@ -338,6 +353,7 @@ async fn main() -> Result<()> {
                 metadata_update_sender.subscribe(),
                 price_feed.receiver(),
                 exit_sender.subscribe(),
+                edge_price_sender.clone(),
             )
         })
         .collect_vec();
@@ -424,6 +440,17 @@ async fn main() -> Result<()> {
         ready_sender.send(()).await.unwrap();
     });
 
+
+    let ring_executor_job = ring_executor::spawn_ring_executor_job(
+        &config,
+  //      ready_sender,  
+        chain_data_wrapper.clone(),
+        path_warming_amounts,
+        edges.clone(),
+        edge_price_updates,
+        exit_sender.subscribe(),
+    );
+
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
 //        server_job.join_handle,
         price_feed_job,
@@ -434,6 +461,7 @@ async fn main() -> Result<()> {
 //        tx_watcher_job,
         account_update_job,
  //       liquidity_job,
+        ring_executor_job,
     ]
     .into_iter()
     .chain(update_jobs.into_iter())

@@ -1,24 +1,40 @@
-[orca]
-enabled = true
-mints = [
-    "So11111111111111111111111111111111111111112",  # SOL
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
-    "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", # JitoSOL
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
-    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",  # JUP
-    "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm", # INF
-    "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4", # JLP
-]
-take_all_mints = false
-add_mango_tokens = false
-
 [cropper]
 enabled = true
 mints = [
     "So11111111111111111111111111111111111111112",  # SOL
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+     "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", # JitoSOL
+#     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+#     "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",  # JUP
+#     "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm", # INF
+#     "27G8MtK7VtTcCHkpASjSDdkWWYfoqT6ggEuKidVJidD4", # JLP
 ]
+take_all_mints = false
+add_mango_tokens = false
+
+[raydium_cp]
+enabled = false
+mints = [
+    "So11111111111111111111111111111111111111112",  # SOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+]
+take_all_mints = false
+add_mango_tokens = false
+
+[raydium]
+enabled = false
+mints = [
+    "So11111111111111111111111111111111111111112",  # SOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+]
+take_all_mints = false
+add_mango_tokens = false
+
+[orca]
+enabled = false
+mints = []
 take_all_mints = false
 add_mango_tokens = false
 
@@ -27,12 +43,13 @@ path_cache_validity_ms = 30000
 path_warming_interval_secs = 15
 path_warming_for_mints = [
     "So11111111111111111111111111111111111111112",
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+#    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
 ]
 path_warming_mode = "ConfiguredMints"
 lookup_tables = ["87TgskchTNEv1uXkGQk1U4zt65tjqbfGAZWNMGAcRRPx"]
 slot_excessive_lag = 3000
+path_warming_amounts = [1,2]
 
 [server]
 address = "127.0.0.1:8888"
@@ -45,12 +62,17 @@ output_stdout = true
 [[sources]]
 dedup_queue_size = 50000
 rpc_http_url = "https://solana-rpc.publicnode.com/"
+#rpc_http_url = "http://37.61.215.175:8899"
+rpc_support_compression = false
 
 [[sources.grpc_sources]]
 name = "accountsdb-client"
 connection_string = "https://solana-yellowstone-grpc.publicnode.com:443/"
+#connection_string = "http://37.61.215.175:10001"
 retry_connection_sleep_secs = 30
 
 [price_feed]
 birdeye_token = "<TOKEN>"
-refresh_interval_secs = 1800 # every 30 min
+refresh_interval_secs = 60 # every 30 min  为什么默认给30分钟？
+
+[ring]

@@ -15,7 +15,8 @@ anyhow = { workspace = true }
 solana-sdk = { workspace = true }
 base64 = "0.12.3"
 dashmap = "6.0.1"
-reqwest = { workspace = true, features = ["json"] }
+#reqwest = { workspace = true, features = ["json"] }
+reqwest = { workspace = true, default-features = false, features = ["rustls-tls"] }
 router-config-lib = { path = "../router-config-lib/" }
 async-trait = "0.1.79"
 solana-client = { workspace = true }

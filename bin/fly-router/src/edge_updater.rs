@@ -114,6 +114,8 @@ struct EdgeUpdater {
     config: Config,
     // 路径预热金额列表
     path_warming_amounts: Vec<u64>,
+
+    edge_price_sender: async_channel::Sender<Arc<Edge>>,
 }
 
 // 启动边更新器任务
@@ -131,6 +133,7 @@ pub fn spawn_updater_job(
     mut metadata_updates: broadcast::Receiver<FeedMetadata>,
     mut price_updates: broadcast::Receiver<PriceUpdate>,
     mut exit: broadcast::Receiver<()>,
+    edge_price_sender: async_channel::Sender<Arc<Edge>>,
 ) -> Option<JoinHandle<()>> {
     // 克隆 DEX 实例
     let dex = dex.clone();
@@ -205,6 +208,7 @@ pub fn spawn_updater_job(
                 ..EdgeUpdaterState::default()
             },
             path_warming_amounts,
+            edge_price_sender,
         };
 
         // 初始化刷新间隔
@@ -513,6 +517,7 @@ impl EdgeUpdater {
             }
         }
         for unique_id in &refreshed_edges {
+            let _ = self.edge_price_sender.send(state.dirty_edges[unique_id].clone());
             state.dirty_edges.remove(&unique_id);
         }
 
