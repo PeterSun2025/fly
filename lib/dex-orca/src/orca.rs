@@ -13,11 +13,11 @@ use solana_sdk::commitment_config::CommitmentConfig;
 use std::cell::RefCell;
 use std::mem;
 use tracing::log::debug;
-use tracing::{error, trace};
+use tracing::{error, info, trace};
 use whirlpools_client::state::Tick;
 use whirlpools_client::{
     manager::swap_manager::{swap, PostSwapUpdate},
-    math::sqrt_price_from_tick_index,
+    math::{sqrt_price_from_tick_index,NO_EXPLICIT_SQRT_PRICE_LIMIT},
     state::{TickArray, Whirlpool, MAX_TICK_INDEX, MIN_TICK_INDEX, TICK_ARRAY_SIZE},
     util::SwapTickSequence,
 };
@@ -241,8 +241,12 @@ pub fn simulate_swap_with_tick_array(
     program_id: &Pubkey,
 ) -> anyhow::Result<PostSwapUpdate> {
     let tick_spacing = whirlpool.tick_spacing;
+    // info!(
+    //     "tick_spacing: {:?}",
+    //     tick_spacing,
+    // );
 
-    let tick_array_starts =
+    let tick_array_starts: (i32, _, _) =
         derive_tick_array_start_indexes(whirlpool.tick_current_index, tick_spacing, a_to_b);
 
     trace!(
@@ -253,15 +257,17 @@ pub fn simulate_swap_with_tick_array(
     );
 
     let tick_arrays = fetch_tick_arrays(chain_data, &tick_array_starts, whirlpool_pk, program_id)?;
-    let tick_array_end_index = derive_last_tick_in_seq(&tick_arrays, tick_spacing, a_to_b);
-    trace!(tick_array_end_index, "end");
-    let sqrt_price_limit = sqrt_price_from_tick_index(tick_array_end_index);
+   // let tick_array_end_index = derive_last_tick_in_seq(&tick_arrays, tick_spacing, a_to_b);
+   // info!(tick_array_end_index, "end");
+   // let sqrt_price_limit = sqrt_price_from_tick_index(tick_array_end_index);
+   let sqrt_price_limit = NO_EXPLICIT_SQRT_PRICE_LIMIT;
 
-    trace!(
-        "later ticks: {} {}",
-        tick_arrays.1.is_some(),
-        tick_arrays.2.is_some()
-    );
+    // info!(
+    //     "later ticks: {} {} , sqrt_price_limit: {}",
+    //     tick_arrays.1.is_some(),
+    //     tick_arrays.2.is_some(),
+    //     sqrt_price_limit
+    // );
 
     let mut swap_tick_sequence = if use_only_first_tick_array {
         SwapTickSequence::new(tick_arrays.0.borrow_mut(), None, None)

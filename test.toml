@@ -3,7 +3,7 @@ enabled = true
 mints = [
     "So11111111111111111111111111111111111111112",  # SOL
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
-     "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", # JitoSOL
+#     "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", # JitoSOL
 #     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
 #     "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",  # JUP
 #     "5oVNBeEEQvYi1cX3ir8Dx5n1P7pdxydbGF2X4TxVusJm", # INF
@@ -35,6 +35,16 @@ add_mango_tokens = false
 [orca]
 enabled = false
 mints = []
+take_all_mints = false
+add_mango_tokens = false
+
+[saber]
+enabled = false
+mints = [
+    "So11111111111111111111111111111111111111112",  # SOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+]
 take_all_mints = false
 add_mango_tokens = false
 
@@ -73,6 +83,6 @@ retry_connection_sleep_secs = 30
 
 [price_feed]
 birdeye_token = "<TOKEN>"
-refresh_interval_secs = 60 # every 30 min  为什么默认给30分钟？
+refresh_interval_secs = 600 # every 30 min  为什么默认给30分钟？
 
 [ring]

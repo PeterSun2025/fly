@@ -1,5 +1,3 @@
-
-
 use std::env;
 use std::process::exit;
 use std::sync::RwLockWriteGuard;
@@ -240,14 +238,14 @@ async fn main() -> Result<()> {
             config.cropper.take_all_mints,
             &config.cropper.mints
         ),
-        // dex::generic::build_dex!(
-        //     dex_saber::SaberDex::initialize(&mut router_rpc, HashMap::new()).await?,
-        //     &mango_data,
-        //     config.saber.enabled,
-        //     config.saber.add_mango_tokens,
-        //     config.saber.take_all_mints,
-        //     &config.saber.mints
-        // ),
+        dex::generic::build_dex!(
+            dex_saber::SaberDex::initialize(&mut router_rpc, HashMap::new()).await?,
+            &mango_data,
+            config.saber.enabled,
+            config.saber.add_mango_tokens,
+            config.saber.take_all_mints,
+            &config.saber.mints
+        ),
         dex::generic::build_dex!(
             dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),).await?,
             &mango_data,

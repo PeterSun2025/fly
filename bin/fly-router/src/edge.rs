@@ -236,7 +236,7 @@ impl Edge {
             if self.state.read().unwrap().is_valid {
                 warn!("quote error, disabling edge: {} {err:?}", self.desc());
             } else {
-                debug!("quote error: {} {err:?}", self.desc());
+                info!("quote error: {} {err:?}", self.desc());
             }
         }
 

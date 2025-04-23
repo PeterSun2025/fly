@@ -15,6 +15,7 @@ solana-sdk = { workspace = true }
 solana-logger = "1.17"
 solana-program = "1.17"
 solana-program-test = "1.17"
+#whirlpools-client = { workspace = true }
 whirlpools-client = { workspace = true }
 anchor-lang = "0.29.0"
 anchor-client = "0.29.0"

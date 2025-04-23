@@ -226,12 +226,12 @@ pub fn spawn_updater_job(
                 }
                 // 处理槽位更新
                 slot = slot_updates.recv() => {
-                    info!("{} - slot update {:?}", updater.dex.name, slot);
+                    debug!("{} - slot update {:?}", updater.dex.name, slot);
                     updater.detect_and_handle_slot_lag(slot);
                 }
                 // 处理元数据更新
                 res = metadata_updates.recv() => {
-                    info!("{} - metadata update {:?}", updater.dex.name, res);
+                    debug!("{} - metadata update {:?}", updater.dex.name, res);
                     // 处理元数据更新
                     updater.on_metadata_update(res);
                 }
@@ -517,7 +517,18 @@ impl EdgeUpdater {
             }
         }
         for unique_id in &refreshed_edges {
-            let _ = self.edge_price_sender.send(state.dirty_edges[unique_id].clone());
+            if let Some(edge) = state.dirty_edges.get(&unique_id) {
+                //let _ = self.edge_price_sender.send(edge.clone());
+                match self.edge_price_sender.try_send(edge.clone()) {
+                    Ok(()) => {
+                        debug!("edge send success {:?}", edge.unique_id());
+                    }
+                    Err(err) => {
+                        error!("edge send error {:?} failed to send message: {:?}", edge.unique_id(), err);
+                    }
+                }
+            }
+            
             state.dirty_edges.remove(&unique_id);
         }
 

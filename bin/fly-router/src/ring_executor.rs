@@ -110,22 +110,27 @@ impl RingExecutor {
     pub fn do_dirty_ring(&mut self,edge:Arc<Edge>) {
         let unique_id = edge.unique_id();
         
-        let ring_map = self.edge_rings.get(&unique_id).unwrap_or_else(|| {
-            panic!("No ring found for edge: {:?}", unique_id)
-        });
-        info!("do_dirty_ring : dirty edge: {:?},dirty ring num {} ", unique_id.clone(),ring_map.len());
-        // Iterate over the rings associated with the edge and mark them as dirty
-        ring_map.iter().for_each(|(ring_id, ring)| {
-            self.state.dirty_rings.entry(ring_id.clone()).or_insert(ring.clone());
-        });
+        if let Some(ring_map) = self.edge_rings.get(&unique_id){
+            debug!("do_dirty_ring : dirty edge: {:?},dirty ring num {} ", unique_id.clone(),ring_map.len());
+            // Iterate over the rings associated with the edge and mark them as dirty
+            ring_map.iter().for_each(|(ring_id, ring)| {
+                self.state.dirty_rings.entry(ring_id.clone()).or_insert(ring.clone());
+            });
+        } else {
+            debug!("No ring found for edge: {:?}", unique_id);
+        }
         
     }
 
     pub fn refresh_some(&mut self) {
         let state = &mut self.state;
+
+        debug!("ring executor refresh_some start {},dirty_rings is empty? {}", state.is_ready,state.dirty_rings.is_empty());
+        
         if state.dirty_rings.is_empty() || !state.is_ready {
             return;
         }
+        debug!("ring executor refresh_some doing dirty rings, count: {}", state.dirty_rings.len());
         let started_at = Instant::now();
         let mut refreshed_rings = vec![];
 
@@ -136,12 +141,12 @@ impl RingExecutor {
             if let Some((route_steps, out_amount, context_slot)) = ring.build_route_steps(
                 &self.chain_data,
                 &mut snapshot,
-                1,
+                1_000_000,
             ).ok() {
                 info!(
                     "ring_id = {},  in_amount = {}, out_amount = {}, context_slot = {}",
                     ring_id,
-                    1,
+                    1_000_000,
                     out_amount,
                     context_slot,
                 );
@@ -217,7 +222,7 @@ pub fn spawn_ring_executor_job(
     let listener_job = tokio_spawn("ring_executor", async move {
 
         // 初始化刷新间隔
-        let mut refresh_one_interval = tokio::time::interval(Duration::from_millis(10));
+        let mut refresh_one_interval = tokio::time::interval(Duration::from_millis(100));
         
         // refresh_one_interval.tick().await;
         
@@ -236,9 +241,19 @@ pub fn spawn_ring_executor_job(
                     break;
                 }
                 edge = edge_price_updates.recv() => {
-                    ring_executor.do_dirty_ring(edge.unwrap_or_else(|_| {
-                        panic!("Error receiving edge price update")
-                    }));
+                    match edge {
+                        Ok(edge) => {
+                            //info!("receiving  edge_price_updates, edge: {:?}", edge.unique_id());
+                            ring_executor.do_dirty_ring(edge);
+                        },
+                        Err(e) => {
+                            error!(
+                                "Error on edge_price_updates channel in ring update task {:?}",
+                                 e
+                            );
+                        }
+                    }
+                    
                 },
                 // 处理刷新间隔事件
                 _ = refresh_one_interval.tick() => {
@@ -252,6 +267,9 @@ pub fn spawn_ring_executor_job(
         // 发送准备就绪信号，解除退出处理程序前的阻塞
         // send this to unblock the code in front of the exit handler
       //  let _ = ring_executor.ready_sender.try_send(());
+
+      error!("ring executor job exited..");
+
     });
 
     listener_job
