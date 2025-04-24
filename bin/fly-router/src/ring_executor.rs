@@ -130,7 +130,7 @@ impl RingExecutor {
         if state.dirty_rings.is_empty() || !state.is_ready {
             return;
         }
-        debug!("ring executor refresh_some doing dirty rings, count: {}", state.dirty_rings.len());
+        info!("ring executor refresh_some doing dirty rings, count: {}", state.dirty_rings.len());
         let started_at = Instant::now();
         let mut refreshed_rings = vec![];
 
@@ -243,7 +243,7 @@ pub fn spawn_ring_executor_job(
                 edge = edge_price_updates.recv() => {
                     match edge {
                         Ok(edge) => {
-                            //info!("receiving  edge_price_updates, edge: {:?}", edge.unique_id());
+                            info!("receiving  edge_price_updates, edge: {:?}", edge.unique_id());
                             ring_executor.do_dirty_ring(edge);
                         },
                         Err(e) => {

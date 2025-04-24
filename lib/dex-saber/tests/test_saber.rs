@@ -25,7 +25,7 @@ async fn saber_step_1(options: &HashMap<String, String>) -> anyhow::Result<()> {
     let rpc_url = env::var("RPC_HTTP_URL")?;
     let (mut rpc_client, chain_data) = rpc::rpc_dumper_client(rpc_url, "saber_dump.lz4");
 
-    let dex = dex_saber::SaberDex::initialize(&mut rpc_client, options.clone()).await?;
+    let dex = dex_saber::SaberDex::initialize(&mut rpc_client, options.clone(),true,&Vec::new()).await?;
 
     generate_dex_rpc_dump::run_dump_mainnet_data(dex, rpc_client, chain_data).await?;
 
@@ -35,7 +35,7 @@ async fn saber_step_1(options: &HashMap<String, String>) -> anyhow::Result<()> {
 async fn saber_step_2(options: &HashMap<String, String>) -> anyhow::Result<()> {
     let (mut rpc_client, chain_data) = rpc::rpc_replayer_client("saber_dump.lz4");
 
-    let dex = dex_saber::SaberDex::initialize(&mut rpc_client, options.clone()).await?;
+    let dex = dex_saber::SaberDex::initialize(&mut rpc_client, options.clone(),true,&Vec::new()).await?;
 
     generate_dex_rpc_dump::run_dump_swap_ix("saber_swap.lz4", dex, chain_data).await?;
 

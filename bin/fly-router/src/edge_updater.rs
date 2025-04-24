@@ -189,7 +189,7 @@ pub fn spawn_updater_job(
     };
 
     // 获取初始化超时时间，默认为 5 分钟
-    let init_timeout_in_seconds = config.snapshot_timeout_in_seconds.unwrap_or(60 * 5);
+    let init_timeout_in_seconds = config.snapshot_timeout_in_seconds.unwrap_or(60 * 30);  //暂时修改为30分钟
     // 计算初始化超时时刻
     let init_timeout = Instant::now() + Duration::from_secs(init_timeout_in_seconds);
     // 生成 Tokio 任务

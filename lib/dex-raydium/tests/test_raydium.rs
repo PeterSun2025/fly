@@ -23,7 +23,7 @@ async fn raydium_step_1(options: &HashMap<String, String>) -> anyhow::Result<()>
     let rpc_url = env::var("RPC_HTTP_URL")?;
     let (mut rpc_client, chain_data) = rpc::rpc_dumper_client(rpc_url, "raydium_dump.lz4");
 
-    let dex = dex_raydium::RaydiumDex::initialize(&mut rpc_client, options.clone()).await?;
+    let dex = dex_raydium::RaydiumDex::initialize(&mut rpc_client, options.clone(),true,&Vec::new()).await?;
 
     generate_dex_rpc_dump::run_dump_mainnet_data(dex, rpc_client, chain_data).await?;
 
@@ -33,7 +33,7 @@ async fn raydium_step_1(options: &HashMap<String, String>) -> anyhow::Result<()>
 async fn raydium_step_2(options: &HashMap<String, String>) -> anyhow::Result<()> {
     let (mut rpc_client, chain_data) = rpc::rpc_replayer_client("raydium_dump.lz4");
 
-    let dex = dex_raydium::RaydiumDex::initialize(&mut rpc_client, options.clone()).await?;
+    let dex = dex_raydium::RaydiumDex::initialize(&mut rpc_client, options.clone(),true,&Vec::new()).await?;
 
     generate_dex_rpc_dump::run_dump_swap_ix("raydium_swap.lz4", dex, chain_data).await?;
 

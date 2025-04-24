@@ -34,6 +34,8 @@ impl DexInterface for RaydiumDex {
     async fn initialize(
         rpc: &mut RouterRpcClient,
         _options: HashMap<String, String>,
+        take_all_mints: bool,
+        mints: &Vec<String>,
     ) -> anyhow::Result<Arc<dyn DexInterface>>
     where
         Self: Sized,
@@ -44,6 +46,12 @@ impl DexInterface for RaydiumDex {
 
         let filtered_pools = pools
             .into_iter()
+            //增加对池的过滤，避免过多的账户，如果不是加载所有mints，只加载mints中包含的池
+            .filter(|(_, amm)| {
+                let keep = take_all_mints
+                    || (mints.contains(&amm.coin_vault_mint.to_string()) && mints.contains(&amm.pc_vault_mint.to_string()));
+                keep
+            })
             .filter(|(_, amm)| {
                 AmmStatus::from_u64(amm.status).swap_permission()
                     && !AmmStatus::from_u64(amm.status).orderbook_permission()
@@ -301,6 +309,7 @@ async fn fetch_raydium_accounts(
         .get_program_accounts_with_config(&program_id, config)
         .await?;
 
+    info!("fetch_raydium_accounts - Number of raydium AMM snapshot: {:?}", snapshot.len());    
     let result = snapshot
         .iter()
         .filter_map(|account| {

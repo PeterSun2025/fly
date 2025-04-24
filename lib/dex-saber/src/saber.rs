@@ -34,6 +34,8 @@ impl DexInterface for SaberDex {
     async fn initialize(
         rpc: &mut RouterRpcClient,
         _options: HashMap<String, String>,
+        take_all_mints: bool,
+        mints: &Vec<String>,
     ) -> anyhow::Result<Arc<dyn DexInterface>>
     where
         Self: Sized,

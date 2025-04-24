@@ -1743,6 +1743,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "anyhow",
+ "async-channel",
  "async-trait",
  "chrono",
  "itertools 0.10.5",
@@ -1761,6 +1762,7 @@ dependencies = [
  "solana-program-test",
  "solana-sdk",
  "spl-associated-token-account 1.1.3",
+ "tokio",
  "tracing",
 ]
 

@@ -109,7 +109,7 @@ async fn main() -> Result<()> {
         .unwrap_or_else(|| panic!("did not find a source config for default region"));
 
     //初始化rpc
-    let rpc = build_rpc(&source_config);
+   // let rpc = build_rpc(&source_config);
 
     //每次gma的账号数？？？jupiter quote时用的maxAccounts????
     let number_of_accounts_per_gma = source_config.number_of_accounts_per_gma.unwrap_or(100);
@@ -223,7 +223,8 @@ async fn main() -> Result<()> {
 
     let dexs: Vec<Dex> = [
         dex::generic::build_dex!(
-            OrcaDex::initialize(&mut router_rpc, orca_config).await?,
+            OrcaDex::initialize(&mut router_rpc, orca_config,config.orca.take_all_mints,
+                &config.orca.mints).await?,
             &mango_data,
             config.orca.enabled,
             config.orca.add_mango_tokens,
@@ -231,7 +232,9 @@ async fn main() -> Result<()> {
             &config.orca.mints
         ),
         dex::generic::build_dex!(
-            OrcaDex::initialize(&mut router_rpc, cropper).await?,
+            OrcaDex::initialize(&mut router_rpc, cropper,
+                config.cropper.take_all_mints,
+                &config.cropper.mints).await?,
             &mango_data,
             config.cropper.enabled,
             config.cropper.add_mango_tokens,
@@ -239,7 +242,9 @@ async fn main() -> Result<()> {
             &config.cropper.mints
         ),
         dex::generic::build_dex!(
-            dex_saber::SaberDex::initialize(&mut router_rpc, HashMap::new()).await?,
+            dex_saber::SaberDex::initialize(&mut router_rpc, HashMap::new(),
+            config.saber.take_all_mints,
+            &config.saber.mints).await?,
             &mango_data,
             config.saber.enabled,
             config.saber.add_mango_tokens,
@@ -247,7 +252,9 @@ async fn main() -> Result<()> {
             &config.saber.mints
         ),
         dex::generic::build_dex!(
-            dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),).await?,
+            dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),
+            config.raydium_cp.take_all_mints,
+            &config.raydium_cp.mints).await?,
             &mango_data,
             config.raydium_cp.enabled,
             config.raydium_cp.add_mango_tokens,
@@ -255,7 +262,8 @@ async fn main() -> Result<()> {
             &config.raydium_cp.mints
         ),
         dex::generic::build_dex!(
-            dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),).await?,
+            dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),config.raydium.take_all_mints,
+            &config.raydium.mints).await?,
             &mango_data,
             config.raydium.enabled,
             config.raydium.add_mango_tokens,
@@ -474,7 +482,7 @@ async fn main() -> Result<()> {
                 exit(-1);
             },
             Ok(_) = ready_receiver.recv() => {
-                info!("autobahn-router setup complete");
+                info!("fly-router setup complete");
             },
         );
     }

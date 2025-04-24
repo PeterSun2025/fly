@@ -29,6 +29,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::u64;
 
+
+use tracing::{debug, error, info, trace, warn};
+
 pub struct RaydiumCpDex {
     pub edges: HashMap<Pubkey, Vec<Arc<dyn DexEdgeIdentifier>>>,
     pub needed_accounts: HashSet<Pubkey>,
@@ -39,18 +42,34 @@ impl DexInterface for RaydiumCpDex {
     async fn initialize(
         rpc: &mut RouterRpcClient,
         _options: HashMap<String, String>,
+        take_all_mints: bool,
+        mints: &Vec<String>,
     ) -> anyhow::Result<Arc<dyn DexInterface>>
     where
         Self: Sized,
     {
+        info!( "Initializing RaydiumCpDex");
         let pools =
             fetch_raydium_account::<PoolState>(rpc, RaydiumCpSwap::id(), PoolState::LEN).await?;
+        
+        info!( "RaydiumCpDex Found {} pools", pools.len());
 
+        info!( "Fetching vaults accounts");
         let vaults = pools
             .iter()
+            //增加对池的过滤，避免请求过多的账户，如果不是加载所有mints，只加载mints中包含的池
+            .filter(|(_pool_pk, pool)| {
+                let keep = take_all_mints
+                    || (mints.contains(&pool.token_0_mint.to_string()) && mints.contains(&pool.token_1_mint.to_string()));
+                keep
+            })
             .flat_map(|x| [x.1.token_0_vault, x.1.token_1_vault])
             .collect::<HashSet<_>>();
+        //TODO 这里如果加载全部，有24万个vaults，想要将vaults拆分并发执行
+        //但是拆分后会导致rpc的请求数过多，可能会被rpc拒绝，怎么优化？
         let vaults = rpc.get_multiple_accounts(&vaults).await?;
+        info!( "RaydiumCpDex Found {} vaults", vaults.len());
+        
         let banned_vaults = vaults
             .iter()
             .filter(|x| {
@@ -60,9 +79,14 @@ impl DexInterface for RaydiumCpDex {
             })
             .map(|x| x.0)
             .collect::<HashSet<_>>();
-
+        info!( "RaydiumCpDex Found {} banned vaults", banned_vaults.len());
         let pools = pools
             .iter()
+            .filter(|(_pool_pk, pool)| {
+                let keep = take_all_mints
+                    || (mints.contains(&pool.token_0_mint.to_string()) && mints.contains(&pool.token_1_mint.to_string()));
+                keep
+            })
             .filter(|(_pool_pk, pool)| {
                 pool.token_0_program == Token::id() && pool.token_1_program == Token::id()
                 // TODO Remove filter when 2022 are working
@@ -119,7 +143,7 @@ impl DexInterface for RaydiumCpDex {
             }
             map
         };
-
+        info!( "RaydiumCpDex Found {} edges", edges_per_pk.len());
         Ok(Arc::new(RaydiumCpDex {
             edges: edges_per_pk,
             needed_accounts,
@@ -189,20 +213,36 @@ impl DexInterface for RaydiumCpDex {
         }))
     }
 
+    // 定义一个名为 quote 的方法，它是某个结构体的实例方法，因为使用了 &self
     fn quote(
+        // &self 表示对当前结构体实例的不可变引用，用于调用该结构体的其他方法或访问其字段
         &self,
+        // id 是一个对实现了 DexEdgeIdentifier 特征的类型的不可变引用，使用 Arc 智能指针实现共享所有权
         id: &Arc<dyn DexEdgeIdentifier>,
+        // edge 是一个对实现了 DexEdge 特征的类型的不可变引用，同样使用 Arc 智能指针
         edge: &Arc<dyn DexEdge>,
+        // chain_data 是对 AccountProviderView 类型的不可变引用，可能包含链上账户的相关数据
         chain_data: &AccountProviderView,
+        // in_amount 是一个无符号 64 位整数，表示输入的数量
         in_amount: u64,
+    // 该方法返回一个 anyhow::Result 类型，其中包含一个 Quote 结构体实例，可能会返回错误
     ) -> anyhow::Result<Quote> {
+        // 将 id 从动态类型转换为具体的 RaydiumCpEdgeIdentifier 类型
+        // as_any() 方法将 id 转换为 Any 类型，然后使用 downcast_ref 尝试将其转换为 RaydiumCpEdgeIdentifier 类型
+        // unwrap() 方法用于解包结果，如果转换失败会触发 panic
         let id = id
-            .as_any()
-            .downcast_ref::<RaydiumCpEdgeIdentifier>()
-            .unwrap();
+        .as_any()
+        .downcast_ref::<RaydiumCpEdgeIdentifier>()
+        .unwrap();
+        // 同样地，将 edge 从动态类型转换为具体的 RaydiumCpEdge 类型
         let edge = edge.as_any().downcast_ref::<RaydiumCpEdge>().unwrap();
 
+        // 检查交易池的交换状态
+        // edge.pool.get_status_by_bit(PoolStatusBitIndex::Swap) 用于获取交易池的交换状态位
+        // 如果交换状态为 false，表示交换不可用
         if !edge.pool.get_status_by_bit(PoolStatusBitIndex::Swap) {
+            // 返回一个 Quote 结构体实例，其中输入、输出和手续费金额都为 0
+            // fee_mint 为交易池的第一个代币的铸造地址
             return Ok(Quote {
                 in_amount: 0,
                 out_amount: 0,
@@ -210,19 +250,33 @@ impl DexInterface for RaydiumCpDex {
                 fee_mint: edge.pool.token_0_mint,
             });
         }
+//TODO chain_data.account(&Clock::id())?;获取不到 SysvarC1ock11111111111111111111111111111111 时钟账户信息，需要在chain_data中实现对应账户的数据更新
+        // // 从 chain_data 中获取时钟账户信息
+        // // Clock::id() 返回时钟账户的 ID
+        // // chain_data.account() 方法根据 ID 获取账户信息
+        // // context("read clock") 为错误信息添加上下文，方便调试
+        // let clock = chain_data.account(&Clock::id()).context("read clock")?;
+        // // 从时钟账户数据中反序列化出 Clock 结构体实例
+        // // 并获取当前的 Unix 时间戳，将其转换为无符号 64 位整数
+        // let now_ts = clock.account.deserialize_data::<Clock>()?.unix_timestamp as u64;
+        // // 检查交易池的开放时间是否大于当前时间
+        // // 如果开放时间大于当前时间，表示交易池尚未开放
+        // if edge.pool.open_time > now_ts {
+        //     // 返回一个 Quote 结构体实例，其中输入、输出和手续费金额都为 0
+        //     // fee_mint 为交易池的第一个代币的铸造地址
+        //     return Ok(Quote {
+        //         in_amount: 0,
+        //         out_amount: 0,
+        //         fee_amount: 0,
+        //         fee_mint: edge.pool.token_0_mint,
+        //     });
+        // }
 
-        let clock = chain_data.account(&Clock::id()).context("read clock")?;
-        let now_ts = clock.account.deserialize_data::<Clock>()?.unix_timestamp as u64;
-        if edge.pool.open_time > now_ts {
-            return Ok(Quote {
-                in_amount: 0,
-                out_amount: 0,
-                fee_amount: 0,
-                fee_mint: edge.pool.token_0_mint,
-            });
-        }
-
+        // 根据 id.is_a_to_b 的值决定调用哪个方向的交换函数
         let quote = if id.is_a_to_b {
+            // 调用 swap_base_input 函数进行 A 到 B 方向的交换计算
+            // 传入交易池、配置、代币 0 的金库信息、代币 0 的数量、代币 0 的铸造信息
+            // 代币 1 的金库信息、代币 1 的数量、代币 1 的铸造信息以及输入数量
             let result = swap_base_input(
                 &edge.pool,
                 &edge.config,
@@ -235,6 +289,7 @@ impl DexInterface for RaydiumCpDex {
                 in_amount,
             )?;
 
+            // 根据交换结果创建一个 Quote 结构体实例
             Quote {
                 in_amount: result.0,
                 out_amount: result.1,
@@ -242,6 +297,8 @@ impl DexInterface for RaydiumCpDex {
                 fee_mint: edge.pool.token_0_mint,
             }
         } else {
+            // 调用 swap_base_input 函数进行 B 到 A 方向的交换计算
+            // 传入的参数与 A 到 B 方向相反
             let result = swap_base_input(
                 &edge.pool,
                 &edge.config,
@@ -254,6 +311,7 @@ impl DexInterface for RaydiumCpDex {
                 in_amount,
             )?;
 
+            // 根据交换结果创建一个 Quote 结构体实例
             Quote {
                 in_amount: result.0,
                 out_amount: result.1,
@@ -261,8 +319,9 @@ impl DexInterface for RaydiumCpDex {
                 fee_mint: edge.pool.token_1_mint,
             }
         };
+        // 返回最终的 Quote 结构体实例
         Ok(quote)
-    }
+}
 
     fn build_swap_ix(
         &self,
@@ -399,3 +458,45 @@ async fn fetch_raydium_account<T: Discriminator + AccountDeserialize>(
 
     Ok(result)
 }
+
+
+
+// async fn get_multiple_accounts_batched(
+//     rpc: &mut RouterRpcClient,
+//     all_vaults: &HashSet<Pubkey>,
+//     batch_size: usize,
+//     max_concurrent_requests : usize,
+//     // 这里的batch_size是每个请求的大小，max_concurrent_requests是并发请求的数量
+// ) -> anyhow::Result<Vec<(Pubkey, Account)>> {
+
+//     let semaphore = Arc::new(Semaphore::new(max_concurrent_requests));
+
+//     // 分批次处理 vaults
+//     let mut tasks = Vec::new();
+//     let mut all_results = Vec::new();
+//     let mut batch = HashSet::new();
+
+//     for vault in all_vaults.iter() {
+//         batch.insert(*vault);
+//         if batch.len() >= batch_size {
+//             let rpc_clone = rpc.clone(); // Clone the rpc client to ensure proper ownership
+//             let permit = semaphore.clone().acquire_owned().await?;
+//             let batch_clone = batch.clone();
+//             let task = task::spawn(async move {
+//                 let _permit_guard = permit;
+//                 let result = rpc_clone.get_multiple_accounts(&batch_clone).await?;
+//                 Ok(result) as anyhow::Result<Vec<(Pubkey, Account)>>
+//             });
+//             tasks.push(task);
+//             batch.clear();
+//         }
+       
+//     }
+
+//     // 等待所有任务完成并收集结果
+//     for task in tasks {
+//         let result = task.await??;
+//         all_results.extend(result);
+//     }
+//     Ok(all_results)
+// }
