@@ -6,6 +6,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{Instant,Duration};
 
 use crate::graph::Graph;
+use crate::routing_types::Route;
 // 引入自定义的预导入模块，包含常用的类型和特性
 use crate::{edge, prelude::*};
 use crate::ring::Ring;
@@ -49,9 +50,15 @@ pub struct RingExecutor {
 
     path_warming_amounts: Vec<u64>,
 
+    in_amounts: Vec<u64>,
+
+    expected_gain: u64,
+
     max_path_length: usize,
 
     graph: Graph,
+
+    route_sender: async_channel::Sender<Arc<Route>>,
 
     state: RingExecutorState,
 }
@@ -64,12 +71,19 @@ impl RingExecutor {
         //edge_price_updates: broadcast::Receiver<Arc<Edge>>,
         path_warming_amounts: Vec<u64>,
         edges: Vec<Arc<Edge>>,
+        route_sender: async_channel::Sender<Arc<Route>>,
     ) -> Self {
         let max_path_length: usize  = config.ring.max_path_length.unwrap_or(3);
         let mut ring_mints: Vec<String> = config.ring.ring_mints.clone().unwrap_or_default();
         if ring_mints.is_empty() {     
             ring_mints.push("So11111111111111111111111111111111111111112".to_string());
-         }
+        }
+
+
+        let mut in_amounts: Vec<u64> = config.sender.in_amounts.clone().unwrap_or([10_00_000_000, 500_000_000, 100_000_000].to_vec());
+        in_amounts.sort_by(|a, b| b.cmp(a));
+        let expected_gain: u64 = config.sender.expected_gain.unwrap_or(1_000_000);        
+
         let mut ring_mint_rings: AHashMap<Pubkey, Vec<Arc<Ring>>> = AHashMap::new();
         let mut edge_rings: AHashMap<(Pubkey, Pubkey), AHashMap<String, Arc<Ring>>> = AHashMap::new();
         let mut graph = Graph::new();
@@ -99,8 +113,11 @@ impl RingExecutor {
             //dirty_rings: AHashMap::new(),
             //edge_price_updates,
             path_warming_amounts,
+            in_amounts,
+            expected_gain,
             max_path_length,
             graph,
+            route_sender,
             state: RingExecutorState::default(),
         }
         
@@ -135,24 +152,53 @@ impl RingExecutor {
         let mut refreshed_rings = vec![];
 
         let mut snapshot = HashMap::new();
-        
-        for (ring_id, ring) in self.state.dirty_rings.iter() {
+
+        let dirty_rings_len = state.dirty_rings.len();
+        for (ring_id, ring) in self.state.dirty_rings.iter() { 
             refreshed_rings.push(ring_id.clone());
-            if let Some((route_steps, out_amount, context_slot)) = ring.build_route_steps(
-                &self.chain_data,
-                &mut snapshot,
-                1_000_000,
-            ).ok() {
-                info!(
-                    "ring_id = {},  in_amount = {}, out_amount = {}, context_slot = {}",
-                    ring_id,
-                    1_000_000,
-                    out_amount,
-                    context_slot,
-                );
+
+            for in_amount in self.in_amounts.iter() {
+                if let Some((route_steps, out_amount, context_slot)) = ring.build_route_steps(
+                    &self.chain_data,
+                    &mut snapshot,
+                    *in_amount,
+                ).ok() {
+                    let gain = out_amount - in_amount;
+                    if gain > self.expected_gain && gain != ring.ring_state.read().unwrap().current_gain {
+                        ring.ring_state.write().unwrap().current_gain = gain;
+                        info!(
+                            "ring_id = {},  in_amount = {}, out_amount = {}, gain = {}, context_slot = {}",
+                            ring_id,
+                            in_amount,
+                            out_amount,
+                            gain,
+                            context_slot,
+                        );
+        
+                        let route = Arc::new(Route {
+                            input_mint: ring.ring_mint.clone(),
+                            output_mint: ring.ring_mint.clone(),
+                            in_amount: route_steps.first().map_or(0, |step| step.in_amount),
+                            out_amount: route_steps.last().map_or(0, |step| step.out_amount),
+                            price_impact_bps:0,
+                            steps: route_steps,
+                            slot: context_slot,
+                            accounts: Default::default(),//为什么quote里是Default::default()？
+                        });
+                        self.route_sender.send(route);
+                        break;
+                    }
+
+                    
+    
+    
+                }
+                
             }
             
             if started_at.elapsed() > Duration::from_millis(200) {
+                warn!("computing ring price took more than 200ms, dirty_rings {}, refreshed_rings {} ", 
+                    dirty_rings_len,refreshed_rings.len());
                 self.state.dirty_rings.clear();
                 break;
             }
@@ -173,6 +219,7 @@ pub fn spawn_ring_executor_job(
     path_warming_amounts: Vec<u64>,
     edges: Vec<Arc<Edge>>,
     edge_price_updates: async_channel::Receiver<Arc<Edge>>,
+    route_sender: async_channel::Sender<Arc<Route>>,
     mut exit: broadcast::Receiver<()>,
 ) -> JoinHandle<()> {   
 
@@ -184,6 +231,7 @@ pub fn spawn_ring_executor_job(
        // edge_price_updates,
         path_warming_amounts,
         edges.clone(),
+        route_sender,
     );
 
     // // Spawn the executor job

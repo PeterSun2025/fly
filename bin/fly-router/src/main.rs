@@ -3,6 +3,8 @@ use std::process::exit;
 use std::sync::RwLockWriteGuard;
 use std::time::{Duration, Instant};
 use std::sync::atomic::Ordering;
+use routing_types::Route;
+use server::live_account_provider::LiveAccountProvider;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
@@ -14,6 +16,10 @@ use crate::util::tokio_spawn;
 use crate::source::mint_accounts_source::{request_mint_metadata, Token};
 use crate::token_cache::{Decimals, TokenCache};
 use crate::hot_mints::HotMintsCache;
+
+use crate::ix_builder::{SwapInstructionsBuilderImpl, SwapStepInstructionBuilderImpl};
+use crate::server::alt_provider::RpcAltProvider;
+use crate::server::hash_provider::RpcHashProvider;
 
 use mango_feeds_connector::chain_data::ChainData;
 use mango_feeds_connector::SlotUpdate;
@@ -60,10 +66,19 @@ mod util;
 mod utils;
 mod hot_mints;
 mod source;
+mod swap;
 mod syscallstubs;
 mod token_cache;
 
 pub mod graph;
+
+mod server;
+mod alt;
+pub mod ix_builder;
+mod ix_sender_executor;
+mod sender;
+mod test_utils;
+
 
 
 
@@ -139,6 +154,9 @@ async fn main() -> Result<()> {
 
     let (edge_price_sender  , edge_price_updates) =
     async_channel::unbounded::<Arc<Edge>>();
+
+    let (route_sender, route_receiver) =
+        async_channel::unbounded::<Arc<Route>>();
 
     let chain_data = Arc::new(RwLock::new(ChainData::new()));
     start_chaindata_updating(
@@ -454,8 +472,44 @@ async fn main() -> Result<()> {
         path_warming_amounts,
         edges.clone(),
         edge_price_updates,
+        route_sender,
         exit_sender.subscribe(),
     );
+
+
+    let rpc = build_rpc(&source_config);
+    let hash_provider = Arc::new(RpcHashProvider {
+        rpc_client: rpc,
+        last_update: Default::default(),
+    });
+
+    let alt_provider = Arc::new(RpcAltProvider {
+        rpc_client: build_rpc(&source_config),
+        cache: Default::default(),
+    });
+
+    let live_account_provider = Arc::new(LiveAccountProvider {
+        rpc_client: build_blocking_rpc(&source_config),
+    });
+
+    let ix_builder = Arc::new(SwapInstructionsBuilderImpl::new(
+        SwapStepInstructionBuilderImpl {
+            chain_data: chain_data_wrapper.clone(),
+        },
+        1 // router_version as u8,
+    ));
+
+    
+
+    let sender_executor_job = ix_sender_executor::spawn_sender_executor_job(
+        &config,
+        hash_provider,
+        alt_provider,
+        live_account_provider,
+        ix_builder,
+        route_receiver,
+        exit_sender.subscribe(),
+    ).await;
 
     let mut jobs: futures::stream::FuturesUnordered<_> = vec![
 //        server_job.join_handle,
@@ -468,6 +522,7 @@ async fn main() -> Result<()> {
         account_update_job,
  //       liquidity_job,
         ring_executor_job,
+        sender_executor_job,
     ]
     .into_iter()
     .chain(update_jobs.into_iter())
@@ -643,4 +698,13 @@ fn build_price_feed(
     );
     
     (Box::new(price_feed), join_handle)
+}
+
+fn build_blocking_rpc(source_config: &AccountDataSourceConfig) -> BlockingRpcClient {
+    BlockingRpcClient::new_with_timeouts_and_commitment(
+        string_or_env(source_config.rpc_http_url.clone()),
+        Duration::from_secs(source_config.request_timeout_in_seconds.unwrap_or(60)), // request timeout
+        CommitmentConfig::confirmed(),
+        Duration::from_secs(60), // confirmation timeout
+    )
 }

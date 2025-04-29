@@ -18,6 +18,7 @@ use router_lib::dex::DexEdge;
 #[derive(Clone, Debug, Default, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct RingState {
     pub cached_prices: Vec<(u64, f64, f64)>,
+    pub current_gain: u64,
     is_valid: bool,
 }
 
@@ -27,6 +28,7 @@ pub struct Ring {
     pub ring_id: String,
     pub edges: Vec<Arc<Edge>>,
     //dex_edges: HashMap<(Pubkey, Pubkey), Option<Arc<dyn DexEdge>>>,
+    
     pub ring_state: Arc<RwLock<RingState>>,
 }
 
@@ -52,7 +54,6 @@ impl Ring {
             ring_mint,
             ring_id,
             edges,
-           // dex_edges,
             ring_state: Arc::new(RwLock::new(RingState::default())),
         }
     }

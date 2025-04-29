@@ -31,6 +31,7 @@ pub struct TlsConfig {
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
 pub struct Config {
     pub ring: RingConfig,
+    pub sender: SenderConfig,
     pub routing: RoutingConfig,
     pub server: ServerConfig,
     pub metrics: MetricsConfig,
@@ -221,4 +222,17 @@ pub struct RingConfig {
     pub ring_mints: Option<Vec<String>>,
     pub max_path_length: Option<usize>,
     
+}
+
+#[derive(Clone, Debug, Default, serde_derive::Deserialize)]
+pub struct SenderConfig {
+    pub wallet_pk: String,
+    pub in_amounts: Option<Vec<u64>>,
+    pub expected_gain: Option<u64>,
+    pub lookup_tables: Option<Vec<String>>,
+    pub wrap_and_unwrap_sol: Option<bool>,
+    pub send_mode: Option<String>,
+    pub compute_unit_price_micro_lamports: Option<u64>,
+    pub auto_create_out_ata: Option<bool>,    
+    pub slippage_bps : Option<i32>,
 }

@@ -597,8 +597,7 @@ impl AmmInfo {
                     .ok_or(anyhow::format_err!("pow error"))?,
             )
             .ok_or(anyhow::format_err!("div error"))?;
-        //if min_size < u64::max_value().into() {
-        if min_size < u64::max_value() as u128 {
+        if min_size < u64::max_value().into() {
             self.min_size = Calculator::to_u64(min_size)?;
         } else {
             // must check not zero in process_monitor_step

@@ -16,7 +16,7 @@ use router_lib::dex::{
 };
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
-use solana_client::rpc_filter::RpcFilterType;
+use solana_client::rpc_filter::{Memcmp, MemcmpEncodedBytes, RpcFilterType};
 use solana_program::program_pack::Pack;
 use solana_program::pubkey::Pubkey;
 use solana_sdk::account::ReadableAccount;
@@ -293,10 +293,23 @@ async fn fetch_raydium_accounts(
     rpc: &mut RouterRpcClient,
     program_id: Pubkey,
 ) -> anyhow::Result<Vec<(Pubkey, AmmInfo)>> {
+    let size = std::mem::size_of::<AmmInfo>() as u64;
+    info!("fetch_raydium_accounts - AmmInfo size: {:?}", size);//768  为什么和实际不一样？实际值是752
+
+    // let memcmp = RpcFilterType::Memcmp(Memcmp::new(
+    //     0,                                                    // offset
+    //     MemcmpEncodedBytes::Base64(base64_bytes.to_string()), // encoded bytes
+    // ));
+
     let config = RpcProgramAccountsConfig {
-        filters: Some(vec![RpcFilterType::DataSize(
-            std::mem::size_of::<AmmInfo>() as u64,
-        )]),
+        
+        // TODO  加上过滤条件，返回的账号数量为0，测试时去掉
+        filters: Some(vec![
+            RpcFilterType::DataSize(
+            752u64  //std::mem::size_of::<AmmInfo>() as u64
+            ),
+            
+            ]),
         account_config: RpcAccountInfoConfig {
             encoding: Some(UiAccountEncoding::Base64),
             commitment: Some(CommitmentConfig::finalized()),
