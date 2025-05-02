@@ -1,4 +1,5 @@
 use crate::routing_types::{Route, RouteStep};
+use crate::source;
 use crate::swap::Swap;
 use anchor_lang::Id;
 use anchor_spl::associated_token::get_associated_token_address;
@@ -7,7 +8,9 @@ use fly_executor::swap_ix::generate_swap_ix_data;
 use router_lib::dex::{AccountProviderView, SwapInstruction, SwapMode};
 use solana_program::instruction::Instruction;
 use solana_program::pubkey::Pubkey;
+use solana_sdk::blake3::Hash;
 use std::str::FromStr;
+use std::collections::HashMap;
 
 const CU_PER_HOP_DEFAULT: u32 = 80_000;
 const CU_BASE: u32 = 150_000;
@@ -28,8 +31,9 @@ pub trait SwapInstructionsBuilder {
         &self,
         wallet_pk: &Pubkey,
         route: &Route,
-        wrap_and_unwrap_sol: bool,
-        auto_create_out: bool,
+       // wrap_and_unwrap_sol: bool,
+       // auto_create_out: bool,
+      source_atas:  &HashMap <Pubkey, Pubkey>,
         max_slippage_bps: i32,
         other_amount_threshold: u64,
         swap_mode: SwapMode,
@@ -83,8 +87,9 @@ impl<T: SwapStepInstructionBuilder> SwapInstructionsBuilder for SwapInstructions
         &self,
         wallet_pk: &Pubkey,
         route: &Route,
-        auto_wrap_sol: bool,
-        auto_create_out: bool,
+        //auto_wrap_sol: bool,
+        //auto_create_out: bool,
+        source_atas:  &HashMap <Pubkey, Pubkey>,
         max_slippage_bps: i32,
         other_amount_threshold: u64,
         swap_mode: SwapMode,
@@ -100,27 +105,27 @@ impl<T: SwapStepInstructionBuilder> SwapInstructionsBuilder for SwapInstructions
         let sol_mint: Pubkey =
             Pubkey::from_str("So11111111111111111111111111111111111111112").unwrap();
 
-        if auto_wrap_sol && route.input_mint == sol_mint {
-            Self::create_ata(&wallet_pk, &mut setup_instructions, &sol_mint);
-            let wsol_account = get_associated_token_address(wallet_pk, &sol_mint);
+        // if auto_wrap_sol && route.input_mint == sol_mint {
+        //     Self::create_ata(&wallet_pk, &mut setup_instructions, &sol_mint);
+        //     let wsol_account = get_associated_token_address(wallet_pk, &sol_mint);
 
-            let in_amount = match swap_mode {
-                SwapMode::ExactIn => route.in_amount,
-                SwapMode::ExactOut => other_amount_threshold,
-            };
+        //     let in_amount = match swap_mode {
+        //         SwapMode::ExactIn => route.in_amount,
+        //         SwapMode::ExactOut => other_amount_threshold,
+        //     };
 
-            setup_instructions.push(solana_program::system_instruction::transfer(
-                &wallet_pk,
-                &wsol_account,
-                in_amount,
-            ));
-            setup_instructions.push(anchor_spl::token::spl_token::instruction::sync_native(
-                &Token::id(),
-                &wsol_account,
-            )?);
+        //     setup_instructions.push(solana_program::system_instruction::transfer(
+        //         &wallet_pk,
+        //         &wsol_account,
+        //         in_amount,
+        //     ));
+        //     setup_instructions.push(anchor_spl::token::spl_token::instruction::sync_native(
+        //         &Token::id(),
+        //         &wsol_account,
+        //     )?);
 
-            Self::close_wsol_ata(&wallet_pk, &mut cleanup_instructions, &wsol_account)?;
-        }
+        //     Self::close_wsol_ata(&wallet_pk, &mut cleanup_instructions, &wsol_account)?;
+        // }
 
         // We don't really care about Orca/Raydium/Openbook min out amount
         //   since we are checking it at the end of execution anyway
@@ -144,16 +149,18 @@ impl<T: SwapStepInstructionBuilder> SwapInstructionsBuilder for SwapInstructions
         let mut cu_estimate = CU_BASE;
 
         for step in &swap_instructions {
-            if auto_create_out || (step.out_mint == sol_mint && auto_wrap_sol) {
+            //if step.out_mint == sol_mint && auto_wrap_sol {
+            if !source_atas.contains_key(&step.out_mint) {
                 Self::create_ata(&wallet_pk, &mut setup_instructions, &step.out_mint);
                 cu_estimate += 12_000;
             }
 
-            if step.out_mint == sol_mint && auto_wrap_sol {
-                let wsol_account = get_associated_token_address(wallet_pk, &sol_mint);
-                Self::close_wsol_ata(&wallet_pk, &mut cleanup_instructions, &wsol_account)?;
-                cu_estimate += 12_000;
-            }
+            
+            // if step.out_mint == sol_mint && auto_wrap_sol {
+            //     let wsol_account = get_associated_token_address(wallet_pk, &sol_mint);
+            //     Self::close_wsol_ata(&wallet_pk, &mut cleanup_instructions, &wsol_account)?;
+            //     cu_estimate += 12_000;
+            // }
 
             cu_estimate += step.cu_estimate.unwrap_or(CU_PER_HOP_DEFAULT);
         }
@@ -376,8 +383,8 @@ mod tests {
                 slot: 0,
                 accounts: None,
             },
-            false,
-            false,
+            &HashMap::new(),
+ //           false,
             0,
             0,
             SwapMode::ExactIn,
@@ -403,8 +410,8 @@ mod tests {
                 slot: 0,
                 accounts: None,
             },
-            false,
-            false,
+            &HashMap::new(),
+  //          false,
             0,
             0,
             SwapMode::ExactOut,
@@ -465,8 +472,8 @@ mod tests {
                         fee_mint: Default::default(),
                     }],
                 },
-                true,
-                false,
+                &HashMap::new(),
+             //   false,
                 0,
                 0,
                 swap_mode,
@@ -508,8 +515,8 @@ mod tests {
                         fee_mint: Default::default(),
                     }],
                 },
-                false,
-                false,
+                &HashMap::new(),
+                //false,
                 0,
                 0,
                 SwapMode::ExactIn,
@@ -551,8 +558,8 @@ mod tests {
                         fee_mint: Default::default(),
                     }],
                 },
-                false,
-                false,
+                &HashMap::new(),
+                //false,
                 0,
                 0,
                 SwapMode::ExactOut,

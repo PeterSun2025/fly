@@ -35,7 +35,7 @@ uint = { version = "0.9.1" }
 #quic-geyser-common = { git = "https://github.com/blockworks-foundation/quic_geyser_plugin.git", branch = "router_v1.17.29" }
 jemalloc-sys = { version = "0.5", features = ["vendored"] }  # 关键！
 
-
+myrust = { path = "../myrust" }
 [profile.release]
 overflow-checks = true
 

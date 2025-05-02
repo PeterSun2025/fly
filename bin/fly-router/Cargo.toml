@@ -50,6 +50,7 @@ rand = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+get_if_addrs = "0.5"
 # serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 sha2 = "0.10.6"
 shellexpand = "2.1.0"
@@ -62,6 +63,7 @@ solana-program = "1.17"
 solana-program-test = "1.17"
 solana-sdk = { workspace = true }
 solana-transaction-status = { version = "1.17" }
+spl-token = "3.5"
 tokio = { workspace = true }
 tokio-stream = { version = "0.1"}
 tokio-tungstenite = "0.21"
@@ -109,6 +111,8 @@ bincode = "1.3.3"
 # metrics
 prometheus = "0.13.4"
 warp = "0.3.5"
+
+myrust = { workspace = true }
 
 [dev-dependencies]
 test-case = "*"

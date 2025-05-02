@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_config::RpcProgramAccountsConfig;
 use solana_client::rpc_filter::{Memcmp, RpcFilterType};
+use solana_client::rpc_request::TokenAccountsFilter;
+use solana_client::rpc_response::RpcKeyedAccount;
 use solana_sdk::account::{Account, AccountSharedData};
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
@@ -22,6 +24,7 @@ use std::time::Duration;
 struct RpcDump {
     pub cache: HashMap<Pubkey, Option<Account>>,
     pub cache_gpa: HashMap<(Pubkey, String), Option<Vec<AccountWrite>>>,
+    pub cache_ata: Vec<RpcKeyedAccount>,
     pub missing_accounts: HashSet<Pubkey>,
 }
 
@@ -82,6 +85,15 @@ impl RouterRpcClientTrait for ReplayerRpcClient {
             Some(x) => Ok(x.clone()),
             None => anyhow::bail!("Invalid gpa"),
         }
+    }
+
+    async fn get_token_accounts_by_owner_with_commitment(
+        &self,
+        owner: &Pubkey,
+        token_account_filter: TokenAccountsFilter,
+        commitment_config: CommitmentConfig,
+    ) -> solana_client::client_error::Result<Vec<RpcKeyedAccount>> {
+        Ok(self.dump.cache_ata.clone())
     }
 
     fn is_gpa_compression_enabled(&self) -> bool {
@@ -179,6 +191,17 @@ impl RouterRpcClientTrait for DumpRpcClient {
         }
     }
 
+    async fn get_token_accounts_by_owner_with_commitment(
+        &self,
+        owner: &Pubkey,
+        token_account_filter: TokenAccountsFilter,
+        commitment_config: CommitmentConfig,
+    ) -> solana_client::client_error::Result<Vec<RpcKeyedAccount>> {
+        self.rpc
+            .get_token_accounts_by_owner_with_commitment(owner, token_account_filter, commitment_config)
+            .await
+    }
+
     fn is_gpa_compression_enabled(&self) -> bool {
         false
     }
@@ -202,6 +225,7 @@ pub fn rpc_dumper_client(url: String, out_path: &str) -> (RouterRpcClient, Chain
                 cache: Default::default(),
                 cache_gpa: Default::default(),
                 missing_accounts: Default::default(),
+                cache_ata: Vec::default(),
             },
             chain_data: chain_data.clone(),
             rpc: RouterRpcClient {

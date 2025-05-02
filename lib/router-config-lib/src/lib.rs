@@ -226,13 +226,18 @@ pub struct RingConfig {
 
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
 pub struct SenderConfig {
-    pub wallet_pk: String,
+    //pub wallet_pk: String,
+    pub name: Option<String>,
     pub in_amounts: Option<Vec<u64>>,
     pub expected_gain: Option<u64>,
     pub lookup_tables: Option<Vec<String>>,
-    pub wrap_and_unwrap_sol: Option<bool>,
+   // pub wrap_and_unwrap_sol: Option<bool>,
     pub send_mode: Option<String>,
     pub compute_unit_price_micro_lamports: Option<u64>,
-    pub auto_create_out_ata: Option<bool>,    
+   // pub auto_create_out_ata: Option<bool>,    
     pub slippage_bps : Option<i32>,
+    pub jito_tip_bps: Option<f32>,
+    pub jito_max_tip: Option<u64>,
+    pub jito_regions: Option<Vec<String>>,
+    pub region_send_type: Option<String>,
 }

@@ -3,6 +3,8 @@ use std::process::exit;
 use std::sync::RwLockWriteGuard;
 use std::time::{Duration, Instant};
 use std::sync::atomic::Ordering;
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use routing_types::Route;
 use server::live_account_provider::LiveAccountProvider;
 use tokio::sync::broadcast;
@@ -45,6 +47,7 @@ use source::geyser;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_client::RpcClient as BlockingRpcClient;
 use solana_sdk::commitment_config::CommitmentConfig;
+use solana_sdk::signature::{Keypair, Signer};
 
 use prelude::*;
 use itertools::chain;
@@ -81,7 +84,6 @@ mod test_utils;
 
 
 
-
 #[tokio::main(flavor = "multi_thread", worker_threads = 16)]
 async fn main() -> Result<()> {
     router_feed_lib::utils::tracing_subscriber_init();
@@ -98,6 +100,20 @@ async fn main() -> Result<()> {
     let config = Config::load(&args[1])?;
     info!("Config loaded: {:?}", config);  // 添加配置加载日志
     //let router_version = RouterVersion::OverestimateAmount;
+    let encrypted_private_key = args[2].clone();
+    let password = myrust::mycrypt::read_secret("输入密钥: ").unwrap_or_else(|_| {
+        panic!("Failed to read password");
+
+    });
+    let private_key = myrust::mycrypt::decrypt(&encrypted_private_key, &password).unwrap_or_else(|_| {
+        panic!("Failed to decrypt private key");
+    });
+    let keypair = Keypair::from_base58_string(&private_key);
+    info!("pubkey: {:?}", keypair.pubkey().to_string());  // 添加密钥加载日志
+    let _ = encrypted_private_key.trim();
+    let _ = password.trim();
+    let _ = private_key.trim();
+
 
     //获取配置文件中的hot_mints 初始化HotMintsCache
     let hot_mints = Arc::new(RwLock::new(HotMintsCache::new(&config.hot_mints)));
@@ -215,7 +231,7 @@ async fn main() -> Result<()> {
         .routing
         .path_warming_amounts
         .clone()
-        .unwrap_or(vec![100, 1000]);
+        .unwrap_or(vec![100]);
 
     let mut orca_config = HashMap::new();
     orca_config.insert(
@@ -503,10 +519,13 @@ async fn main() -> Result<()> {
 
     let sender_executor_job = ix_sender_executor::spawn_sender_executor_job(
         &config,
+        build_rpc(&source_config),
+        keypair,
         hash_provider,
         alt_provider,
         live_account_provider,
         ix_builder,
+       // ix_sender,
         route_receiver,
         exit_sender.subscribe(),
     ).await;

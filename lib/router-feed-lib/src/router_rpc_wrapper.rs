@@ -5,7 +5,10 @@ use itertools::Itertools;
 use solana_account_decoder::UiAccountEncoding;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_client::rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig};
+use solana_client::rpc_request::TokenAccountsFilter;
+use solana_client::rpc_response::RpcKeyedAccount;
 use solana_sdk::account::Account;
+use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::pubkey::Pubkey;
 
 use crate::account_write::AccountWrite;
@@ -66,6 +69,18 @@ impl RouterRpcClientTrait for RouterRpcWrapper {
                     .1,
             )
         }
+    }
+
+    async fn get_token_accounts_by_owner_with_commitment(
+        &self,
+        owner: &Pubkey,
+        token_account_filter: TokenAccountsFilter,
+        commitment_config: CommitmentConfig,
+    ) -> solana_client::client_error::Result<Vec<RpcKeyedAccount>> {
+        self.rpc
+            .get_token_accounts_by_owner_with_commitment(owner, token_account_filter, commitment_config)
+            .await
+            .map(|response| response.value)
     }
 
     fn is_gpa_compression_enabled(&self) -> bool {

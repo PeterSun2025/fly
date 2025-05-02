@@ -513,6 +513,12 @@ impl EdgeUpdater {
             // 避免处理时间过长
             // Do not process for too long or we could miss update in account write queue
             if started_at.elapsed() > Duration::from_millis(100) {
+                warn!(
+                    "{} - refresh {} - took - {:?} - too long",
+                    self.dex.name,
+                    refreshed_edges.len(),
+                    started_at.elapsed()
+                );
                 break;
             }
         }
@@ -534,19 +540,19 @@ impl EdgeUpdater {
 
         state.latest_slot_processed = state.latest_slot_pending;
 
-        if started_at.elapsed() > Duration::from_millis(100) {
-            // debug!(
-            //     "{} - refresh {} - took - {:?}",
-            //     self.dex.name,
-            //     refreshed_edges.len(),
-            //     started_at.elapsed()
-            // )
-            info!(
-                "{} - refresh {} - took - {:?}",
-                self.dex.name,
-                refreshed_edges.len(),
-                started_at.elapsed()
-            )
-        }
+        // if started_at.elapsed() > Duration::from_millis(100) {
+        //     // debug!(
+        //     //     "{} - refresh {} - took - {:?}",
+        //     //     self.dex.name,
+        //     //     refreshed_edges.len(),
+        //     //     started_at.elapsed()
+        //     // )
+        //     info!(
+        //         "{} - refresh {} - took - {:?}",
+        //         self.dex.name,
+        //         refreshed_edges.len(),
+        //         started_at.elapsed()
+        //     )
+        // }
     }
 }

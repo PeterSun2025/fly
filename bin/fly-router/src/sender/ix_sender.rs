@@ -1,11 +1,15 @@
 
 use std::collections::HashMap;
+use std::sync::Arc;
+use axum::async_trait;
 // Import Serialize and Deserialize macros from serde.
 use serde::{Serialize, Deserialize};
 
-use crate::{server::hash_provider::HashProvider, swap::Swap}; // Import Swap if it exists in another module or define it below.
+use crate::{routing_types::Route, server::{client_provider::ClientProvider, hash_provider::HashProvider}, swap::Swap}; // Import Swap if it exists in another module or define it below.
 use std::str::FromStr; // Import FromStr trait for parsing strings.
-use solana_sdk::transaction::Transaction;
+use solana_sdk::{address_lookup_table::AddressLookupTableAccount, transaction::VersionedTransaction, signer::keypair::Keypair};
+
+use super::jito_ix_sender::JitoIxSender;
 
 #[derive(Clone, Copy, Hash, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u8)]
@@ -37,8 +41,42 @@ impl ToString for SendMode {
     }
 }
 
+#[async_trait]
 pub trait IxSender {
-    async fn instructuin_extend(&self, swap: &Swap) -> anyhow::Result<HashMap<String, Vec<Transaction>>>;
-    async fn send_tx(&self, swaps: HashMap<String, Vec<Transaction>>) -> anyhow::Result<()>;
+    async fn instructuin_extend(&self, swap: Arc<Swap>,route:Arc<Route>) -> anyhow::Result<HashMap<String, Vec<VersionedTransaction>>>;
+    async fn send_tx(&self, transactions: HashMap<String, Vec<VersionedTransaction>>) -> anyhow::Result<()>;
+}
+
+pub fn generate_ix_sender<THashProvider>(mode: SendMode,
+    name: String,
+    keypair: Keypair,
+    alt_accounts: Vec<AddressLookupTableAccount>,
+    compute_unit_price_micro_lamports: u64,
+    jito_tip_bps: f32,
+    jito_max_tip: u64,
+    jito_regions: Vec<String>,
+    region_send_type: String,
+    hash_provider: Arc<THashProvider>,
+    client_provider: Arc<ClientProvider>) -> anyhow::Result<Arc<Box<dyn IxSender + Send + Sync + 'static>>> 
+    where 
+    THashProvider: HashProvider + Send + Sync + 'static,
+    {
+    match mode {
+        SendMode::JitoBundle => {
+            let sender = JitoIxSender::new(
+                name,
+                keypair,
+                alt_accounts,
+                compute_unit_price_micro_lamports,
+                jito_tip_bps,
+                jito_max_tip,
+                jito_regions,
+                region_send_type,
+                hash_provider,
+                client_provider,
+            );
+            Ok(Arc::new(Box::new(sender)))
+        }
+    }
 }
 

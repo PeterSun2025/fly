@@ -181,64 +181,65 @@ impl Edge {
         price: f64,
         path_warming_amounts: &Vec<u64>,
     ) {
-        // 计算乘数
-        let multiplier = 10u64.pow(decimals as u32) as f64;
-        // 计算不同输入金额对应的数量
-        let amounts = path_warming_amounts
-           .iter()
-           .map(|amount| {
-                let quantity_ui = *amount as f64 / price;
-                let quantity_native = quantity_ui * multiplier;
-                quantity_native.ceil() as u64
-            })
-           .collect_vec();
+        //在环中更新价格，边不再更新自己价格
+        // // 计算乘数
+        // let multiplier = 10u64.pow(decimals as u32) as f64;
+        // // 计算不同输入金额对应的数量
+        // let amounts = path_warming_amounts
+        //    .iter()
+        //    .map(|amount| {
+        //         let quantity_ui = *amount as f64 / price;
+        //         let quantity_native = quantity_ui * multiplier;
+        //         quantity_native.ceil() as u64
+        //     })
+        //    .collect_vec();
 
-        // 记录价格数据的调试信息
-        debug!(input_mint = %self.input_mint, pool = %self.key(), multiplier = multiplier, price = price, amounts = amounts.iter().join(";"), "price_data");
+        // // 记录价格数据的调试信息
+        // debug!(input_mint = %self.input_mint, pool = %self.key(), multiplier = multiplier, price = price, amounts = amounts.iter().join(";"), "price_data");
 
-        // 检查是否有溢出情况
-        let overflow = amounts.iter().any(|x| *x == u64::MAX);
-        if overflow {
-            if self.state.read().unwrap().is_valid {
-                debug!("amount error, disabling edge {}", self.desc());
-            }
+        // // 检查是否有溢出情况
+        // let overflow = amounts.iter().any(|x| *x == u64::MAX);
+        // if overflow {
+        //     if self.state.read().unwrap().is_valid {
+        //         debug!("amount error, disabling edge {}", self.desc());
+        //     }
 
-            // 获取边状态的写锁
-            let mut state = self.state.write().unwrap();
-            // 更新上次更新时间
-            state.last_update = millis_since_epoch();
-            // 更新上次更新槽位
-            state.last_update_slot = chain_data.newest_processed_slot();
-            // 清空缓存价格
-            state.cached_prices.clear();
-            // 标记状态无效
-            state.is_valid = false;
-            return;
-        }
+        //     // 获取边状态的写锁
+        //     let mut state = self.state.write().unwrap();
+        //     // 更新上次更新时间
+        //     state.last_update = millis_since_epoch();
+        //     // 更新上次更新槽位
+        //     state.last_update_slot = chain_data.newest_processed_slot();
+        //     // 清空缓存价格
+        //     state.cached_prices.clear();
+        //     // 标记状态无效
+        //     state.is_valid = false;
+        //     return;
+        // }
 
-        // 准备报价
-        let prepared_quote = self.prepare(chain_data);
+        // // 准备报价
+        // let prepared_quote = self.prepare(chain_data);
 
-        // 计算不同输入金额的报价结果
-        let quote_results_in = amounts
-           .iter()
-           .map(|&amount| match &prepared_quote {
-                Ok(p) => (amount, self.quote(&p, chain_data, amount)),
-                Err(e) => (
-                    amount,
-                    anyhow::Result::<Quote>::Err(anyhow::format_err!("{}", e)),
-                ),
-            })
-           .collect_vec();
+        // // 计算不同输入金额的报价结果
+        // let quote_results_in = amounts
+        //    .iter()
+        //    .map(|&amount| match &prepared_quote {
+        //         Ok(p) => (amount, self.quote(&p, chain_data, amount)),
+        //         Err(e) => (
+        //             amount,
+        //             anyhow::Result::<Quote>::Err(anyhow::format_err!("{}", e)),
+        //         ),
+        //     })
+        //    .collect_vec();
 
-        // 检查是否有报价错误
-        if let Some((_, err)) = quote_results_in.iter().find(|v| v.1.is_err()) {
-            if self.state.read().unwrap().is_valid {
-                warn!("quote error, disabling edge: {} {err:?}", self.desc());
-            } else {
-                info!("edge update_internal quote error: {} {err:?}", self.desc());
-            }
-        }
+        // // 检查是否有报价错误
+        // if let Some((_, err)) = quote_results_in.iter().find(|v| v.1.is_err()) {
+        //     if self.state.read().unwrap().is_valid {
+        //         warn!("quote error, disabling edge: {} {err:?}", self.desc());
+        //     } else {
+        //         info!("edge update_internal quote error: {} {err:?}", self.desc());
+        //     }
+        // }
 
         // 获取边状态的写锁
         let mut state = self.state.write().unwrap();
@@ -258,30 +259,30 @@ impl Edge {
             }
         };
 
-        let mut has_at_least_one_non_zero = false;
-        for quote_result in quote_results_in {
-            if let (in_amount, Ok(quote)) = quote_result {
-                // 计算价格
-                let price = quote.out_amount as f64 / in_amount as f64;
-                if price.is_nan() {
-                    state.is_valid = false;
-                    continue;
-                }
-                if price > 0.0000001 {
-                    has_at_least_one_non_zero = true;
-                }
-                // 将价格和其对数存入缓存
-                state.cached_prices.push((in_amount, price, f64::ln(price)));
-            } else {
-                // 如果报价失败，标记状态无效
-                state.is_valid = false;
-            };
-        }
+        // let mut has_at_least_one_non_zero = false;
+        // for quote_result in quote_results_in {
+        //     if let (in_amount, Ok(quote)) = quote_result {
+        //         // 计算价格
+        //         let price = quote.out_amount as f64 / in_amount as f64;
+        //         if price.is_nan() {
+        //             state.is_valid = false;
+        //             continue;
+        //         }
+        //         if price > 0.0000001 {
+        //             has_at_least_one_non_zero = true;
+        //         }
+        //         // 将价格和其对数存入缓存
+        //         state.cached_prices.push((in_amount, price, f64::ln(price)));
+        //     } else {
+        //         // 如果报价失败，标记状态无效
+        //         state.is_valid = false;
+        //     };
+        // }
 
-        // 如果没有至少一个非零价格，标记状态无效
-        if !has_at_least_one_non_zero {
-            state.is_valid = false;
-        }
+        // // 如果没有至少一个非零价格，标记状态无效
+        // if !has_at_least_one_non_zero {
+        //     state.is_valid = false;
+        // }
     }
 
     // 更新边的状态
@@ -303,12 +304,14 @@ impl Edge {
             return;
         };
         // 获取输入代币的价格
-        let Some(price) = price_cache.price_ui(self.input_mint) else {
-            let mut state = self.state.write().unwrap();
-            state.is_valid = false;
-            trace!("no price for {}", self.input_mint);
-            return;
-        };
+        // let Some(price) = price_cache.price_ui(self.input_mint) else {
+        //     let mut state = self.state.write().unwrap();
+        //     state.is_valid = false;
+        //     trace!("no price for {}", self.input_mint);
+        //     return;
+        // };
+
+        let price =1.0; // TODO: 这里需要获取输入代币的价格
 
         // 调用内部更新方法
         self.update_internal(chain_data, decimals, price, path_warming_amounts);
@@ -389,7 +392,7 @@ impl EdgeState {
         self.cooldown_event += 1;
 
         // 计算冷却因子
-        let counter = min(self.cooldown_event, 5) as f64;
+        let counter = min(self.cooldown_event, 10) as f64;
         let exp_factor = 1.2.pow(counter);
         let factor = (counter * exp_factor).round() as u64;
         let until = millis_since_epoch() + (duration.as_millis() as u64 * factor);

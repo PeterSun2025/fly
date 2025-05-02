@@ -97,6 +97,9 @@ impl RingExecutor {
             info!("ring mint {} have {} rings",ring_mint_string,cycles.len(),);
             for cycle in cycles.iter() {   
                 let ring = Arc::new(Ring::new(ring_mint, cycle.clone()));
+                let mut ring_state = ring.ring_state.write().unwrap();
+                ring_state.set_valid(true);
+                ring_state.reset_cooldown();
                 ring_mint_rings.entry(ring_mint).or_default().push(ring.clone());
                 for edge in cycle.iter() {
                     let unique_id = edge.unique_id();
@@ -131,7 +134,15 @@ impl RingExecutor {
             debug!("do_dirty_ring : dirty edge: {:?},dirty ring num {} ", unique_id.clone(),ring_map.len());
             // Iterate over the rings associated with the edge and mark them as dirty
             ring_map.iter().for_each(|(ring_id, ring)| {
-                self.state.dirty_rings.entry(ring_id.clone()).or_insert(ring.clone());
+                let ring_state = ring.ring_state.read().unwrap();
+                if ring_state.is_valid() {
+                    self.state.dirty_rings.entry(ring_id.clone()).or_insert(ring.clone());
+                } else if ring_state.can_reset_cooldown() {
+                    // Reset cooldown if the ring is valid and can reset cooldown
+                    let mut ring_state = ring.ring_state.write().unwrap();
+                    ring_state.reset_cooldown();
+                    debug!("Reset cooldown for ring_id: {}", ring_id);
+                }
             });
         } else {
             debug!("No ring found for edge: {:?}", unique_id);
@@ -156,7 +167,7 @@ impl RingExecutor {
         let dirty_rings_len = state.dirty_rings.len();
         for (ring_id, ring) in self.state.dirty_rings.iter() { 
             refreshed_rings.push(ring_id.clone());
-
+            let mut has_at_least_one_non_zero = false;
             for in_amount in self.in_amounts.iter() {
                 if let Some((route_steps, out_amount, context_slot)) = ring.build_route_steps(
                     &self.chain_data,
@@ -185,15 +196,21 @@ impl RingExecutor {
                             slot: context_slot,
                             accounts: Default::default(),//为什么quote里是Default::default()？
                         });
-                        self.route_sender.send(route);
+                        let _ = self.route_sender.send(route);
+                        has_at_least_one_non_zero = true;
                         break;
                     }
-
-                    
-    
-    
+                } else {
+                    warn!("Failed to build route steps for ring_id: {}, in_amount: {}", ring_id, in_amount);
                 }
                 
+            }
+
+            if !has_at_least_one_non_zero {
+                let mut ring_state = ring.ring_state.write().unwrap();
+                ring_state.set_valid(false);
+                ring_state.add_cooldown(&Duration::from_secs(30));
+                warn!("Failed to execute ring_id: {}, in_amounts: {:?}", ring_id, self.in_amounts);
             }
             
             if started_at.elapsed() > Duration::from_millis(200) {
