@@ -23,14 +23,14 @@ pub async fn get_all_dex(
     ]);
 
     let dexs = [
-        dex_orca::OrcaDex::initialize(&mut rpc_client, orca_config).await?,
-        dex_orca::OrcaDex::initialize(&mut rpc_client, cropper_config).await?,
-        dex_saber::SaberDex::initialize(&mut rpc_client, HashMap::new()).await?,
-        dex_raydium_cp::RaydiumCpDex::initialize(&mut rpc_client, HashMap::new()).await?,
-        dex_raydium::RaydiumDex::initialize(&mut rpc_client, HashMap::new()).await?,
-        dex_openbook_v2::OpenbookV2Dex::initialize(&mut rpc_client, HashMap::new()).await?,
-        dex_infinity::InfinityDex::initialize(&mut rpc_client, HashMap::new()).await?,
-        dex_invariant::InvariantDex::initialize(&mut rpc_client, HashMap::new()).await?,
+        dex_orca::OrcaDex::initialize(&mut rpc_client, orca_config, false, &vec![]).await?,
+        dex_orca::OrcaDex::initialize(&mut rpc_client, cropper_config,false, &vec![]).await?,
+        //dex_saber::SaberDex::initialize(&mut rpc_client, HashMap::new()).await?,
+        dex_raydium_cp::RaydiumCpDex::initialize(&mut rpc_client, HashMap::new(),false, &vec![]).await?,
+        dex_raydium::RaydiumDex::initialize(&mut rpc_client, HashMap::new(),false, &vec![]).await?,
+        //dex_openbook_v2::OpenbookV2Dex::initialize(&mut rpc_client, HashMap::new()).await?,
+        //dex_infinity::InfinityDex::initialize(&mut rpc_client, HashMap::new()).await?,
+        //dex_invariant::InvariantDex::initialize(&mut rpc_client, HashMap::new()).await?,
     ];
 
     Ok(dexs.into_iter().collect())

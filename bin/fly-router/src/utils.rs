@@ -78,7 +78,7 @@ pub async fn get_source_atas(
             TokenAccountsFilter::ProgramId(spl_token::ID),
             CommitmentConfig::confirmed(),
         ).await?;
-
+        println!("token_accounts value: {:?}", token_accounts.value);   
     let source_atas = token_accounts.value
         .into_iter()
         .filter_map(|kv| {
@@ -112,7 +112,7 @@ mod tests {
     async fn test_get_source_atas() {
         let client = solana_client::nonblocking::rpc_client::RpcClient::new("https://solana-rpc.publicnode.com".to_string());
         
-        let owner = Pubkey::from_str("888DUdR3P4fYa4Es5AVvJhoqwQGhFV56NotdHt2gz3e1").unwrap(); // 替换为实际测试地址
+        let owner = Pubkey::from_str("6JEzdPsh749qUUHUGMWuD7PtR4EDUqMZDG87dMHJm6aD").unwrap(); // 替换为实际测试地址
         
         match get_source_atas(&client, &owner).await {
             Ok(atas) => {

@@ -4,9 +4,10 @@ use router_lib::dex::AccountProviderView;
 use thiserror::Error;
 use tokio::task::JoinHandle;
 use tokio::time::{Instant,Duration};
-
+use std::collections::HashSet;
 use crate::graph::Graph;
 use crate::routing_types::Route;
+use crate::source::token_cache::TokenCache;
 // 引入自定义的预导入模块，包含常用的类型和特性
 use crate::{edge, prelude::*};
 use crate::ring::Ring;
@@ -44,7 +45,9 @@ pub struct RingExecutor {
 
     chain_data: AccountProviderView,
 
-    ring_mint_rings: AHashMap<Pubkey, Vec<Arc<Ring>>>,
+    token_cache: Arc<TokenCache>,
+
+    trading_mint_rings: AHashMap<Pubkey, Vec<Arc<Ring>>>,
 
     edge_rings: AHashMap<(Pubkey, Pubkey), AHashMap<String,Arc<Ring>>>,
 
@@ -67,6 +70,7 @@ impl RingExecutor {
     pub fn new(
         config: &Config,
         chain_data: AccountProviderView,
+        token_cache: Arc<TokenCache>,
        // ready_sender: async_channel::Sender<()>,
         //edge_price_updates: broadcast::Receiver<Arc<Edge>>,
         path_warming_amounts: Vec<u64>,
@@ -74,9 +78,9 @@ impl RingExecutor {
         route_sender: async_channel::Sender<Arc<Route>>,
     ) -> Self {
         let max_path_length: usize  = config.ring.max_path_length.unwrap_or(3);
-        let mut ring_mints: Vec<String> = config.ring.ring_mints.clone().unwrap_or_default();
-        if ring_mints.is_empty() {     
-            ring_mints.push("So11111111111111111111111111111111111111112".to_string());
+        let mut trading_mints: Vec<String> = config.ring.trading_mints.clone().unwrap_or_default();
+        if trading_mints.is_empty() {     
+            trading_mints.push("So11111111111111111111111111111111111111112".to_string());
         }
 
 
@@ -88,15 +92,26 @@ impl RingExecutor {
         let mut edge_rings: AHashMap<(Pubkey, Pubkey), AHashMap<String, Arc<Ring>>> = AHashMap::new();
         let mut graph = Graph::new();
         graph.add_edges(edges.clone()); 
-        for ring_mint_string in ring_mints.iter() {
-            let ring_mint = Pubkey::from_str(ring_mint_string).unwrap_or_else(|_| {
-                panic!("Invalid mint address: {}", ring_mint_string)
+        for trading_mint_string in trading_mints.iter() {
+            let ring_mint = Pubkey::from_str(trading_mint_string).unwrap_or_else(|_| {
+                panic!("Invalid mint address: {}", trading_mint_string)
             });
             let cycles : Vec<Vec<Arc<Edge>>> = graph.find_cycles(ring_mint, max_path_length);
 
-            info!("ring mint {} have {} rings",ring_mint_string,cycles.len(),);
+            info!("ring mint {} have {} rings",trading_mint_string,cycles.len(),);
             for cycle in cycles.iter() {   
-                let ring = Arc::new(Ring::new(ring_mint, cycle.clone()));
+                let mut ring_ming_symbols: HashSet<String> = HashSet::new();
+                for edge in cycle.iter() {
+                    let input_mint = edge.input_mint;
+                    let output_mint = edge.output_mint;
+                    if let Some(input_symbol) = token_cache.get_symbol_by_mint(input_mint) {
+                        ring_ming_symbols.insert(input_symbol);
+                    } 
+                    if let Some(output_symbol) = token_cache.get_symbol_by_mint(output_mint) {
+                        ring_ming_symbols.insert(output_symbol);
+                    }
+                }
+                let ring = Arc::new(Ring::new(ring_mint, cycle.clone(),ring_ming_symbols));
                 let mut ring_state = ring.ring_state.write().unwrap();
                 ring_state.set_valid(true);
                 ring_state.reset_cooldown();
@@ -111,7 +126,8 @@ impl RingExecutor {
         Self {
            // ready_sender,
             chain_data,
-            ring_mint_rings,
+            token_cache,
+            trading_mint_rings: ring_mint_rings,
             edge_rings,
             //dirty_rings: AHashMap::new(),
             //edge_price_updates,
@@ -174,8 +190,8 @@ impl RingExecutor {
                     &mut snapshot,
                     *in_amount,
                 ).ok() {
-                    let gain = out_amount - in_amount;
-                    if gain > self.expected_gain && gain != ring.ring_state.read().unwrap().current_gain {
+                    let gain:i128 = (out_amount - in_amount).into();
+                    if gain > self.expected_gain.into() && gain != ring.ring_state.read().unwrap().current_gain {
                         ring.ring_state.write().unwrap().current_gain = gain;
                         info!(
                             "ring_id = {},  in_amount = {}, out_amount = {}, gain = {}, context_slot = {}",
@@ -187,8 +203,8 @@ impl RingExecutor {
                         );
         
                         let route = Arc::new(Route {
-                            input_mint: ring.ring_mint.clone(),
-                            output_mint: ring.ring_mint.clone(),
+                            input_mint: ring.trading_mint.clone(),
+                            output_mint: ring.trading_mint.clone(),
                             in_amount: route_steps.first().map_or(0, |step| step.in_amount),
                             out_amount: route_steps.last().map_or(0, |step| step.out_amount),
                             price_impact_bps:0,
@@ -201,7 +217,7 @@ impl RingExecutor {
                         break;
                     }
                 } else {
-                    warn!("Failed to build route steps for ring_id: {}, in_amount: {}", ring_id, in_amount);
+                    debug!("Failed to build route steps for ring_id: {}, in_amount: {}", ring_id, in_amount);
                 }
                 
             }
@@ -210,7 +226,7 @@ impl RingExecutor {
                 let mut ring_state = ring.ring_state.write().unwrap();
                 ring_state.set_valid(false);
                 ring_state.add_cooldown(&Duration::from_secs(30));
-                warn!("Failed to execute ring_id: {}, in_amounts: {:?}", ring_id, self.in_amounts);
+                debug!("Failed to execute ring_id: {}, in_amounts: {:?}", ring_id, self.in_amounts);
             }
             
             if started_at.elapsed() > Duration::from_millis(200) {
@@ -233,6 +249,7 @@ pub fn spawn_ring_executor_job(
     config: &Config,
  //   ready_sender: async_channel::Sender<()>,
     chain_data: AccountProviderView,
+    token_cache: Arc<TokenCache>,
     path_warming_amounts: Vec<u64>,
     edges: Vec<Arc<Edge>>,
     edge_price_updates: async_channel::Receiver<Arc<Edge>>,
@@ -244,6 +261,7 @@ pub fn spawn_ring_executor_job(
     let mut ring_executor = RingExecutor::new (
         config,
         chain_data,
+        token_cache,
       //  ready_sender,
        // edge_price_updates,
         path_warming_amounts,
@@ -252,18 +270,18 @@ pub fn spawn_ring_executor_job(
     );
 
 
-    // 获取初始化超时时间，默认为 5 分钟
-    let init_timeout_in_seconds = config.snapshot_timeout_in_seconds.unwrap_or(60);
-    // 计算初始化超时时刻
-    let init_timeout = Instant::now() + Duration::from_secs(init_timeout_in_seconds);
+    // // 获取初始化超时时间，默认为 5 分钟
+    // let init_timeout_in_seconds = config.snapshot_timeout_in_seconds.unwrap_or(60);
+    // // 计算初始化超时时刻
+    // let init_timeout = Instant::now() + Duration::from_secs(init_timeout_in_seconds);
 
-    for edge in edges.iter() {
-        ring_executor.do_dirty_ring(edge.clone());
-        if !ring_executor.state.is_ready && init_timeout < Instant::now() {
-            error!("Failed to init ring executor to do dirty ring before timeout");
-            break;
-        }
-    }
+    // for edge in edges.iter() {
+    //     ring_executor.do_dirty_ring(edge.clone());
+    //     if !ring_executor.state.is_ready && init_timeout < Instant::now() {
+    //         error!("Failed to init ring executor to do dirty ring before timeout");
+    //         break;
+    //     }
+    // }
     ring_executor.state.is_ready = true;
 
     // 生成 Tokio 任务

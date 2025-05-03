@@ -3,6 +3,7 @@ use std::hash::{Hasher,Hash};
 use std::time::Duration;
 use std::collections::hash_map::DefaultHasher;
 use std::cmp::min;
+use std::collections::HashSet;
 use ordered_float::Pow;
 
 // 引入自定义的调试工具模块
@@ -20,7 +21,7 @@ use router_lib::dex::DexEdge;
 #[derive(Clone, Debug, Default, serde_derive::Serialize, serde_derive::Deserialize)]
 pub struct RingState {
     pub cached_prices: Vec<(u64, f64, f64)>,
-    pub current_gain: u64,
+    pub current_gain: i128,
     is_valid: bool,
 
     /// 这条环经历了多少次冷却事件
@@ -31,11 +32,11 @@ pub struct RingState {
 
 pub struct Ring {
     /// The mint of the ring. This is the mint of the token that will be used to pay for the swap.
-    pub ring_mint: Pubkey,
+    pub trading_mint: Pubkey,
     pub ring_id: String,
     pub edges: Vec<Arc<Edge>>,
     //dex_edges: HashMap<(Pubkey, Pubkey), Option<Arc<dyn DexEdge>>>,
-    
+    pub ring_ming_symbols: HashSet<String>,
     pub ring_state: Arc<RwLock<RingState>>,
 }
 
@@ -49,8 +50,8 @@ pub  fn ring_id_hash_from_edges (ring_mint:&Pubkey,edges: &[Arc<Edge>]) -> Strin
 }
 
 impl Ring {
-    pub fn new(ring_mint: Pubkey, edges: Vec<Arc<Edge>>) -> Self {
-        let ring_id = ring_id_hash_from_edges(&ring_mint,&edges);
+    pub fn new(trading_mint: Pubkey, edges: Vec<Arc<Edge>>,ring_ming_symbols:HashSet<String>) -> Self {
+        let ring_id = ring_id_hash_from_edges(&trading_mint,&edges);
         // let mut dex_edges: HashMap<(Pubkey, Pubkey), Option<Arc<dyn DexEdge>>> = HashMap::new();
         // for edge in edges.iter() {
         //     dex_edges.entry(edge.unique_id())
@@ -58,9 +59,10 @@ impl Ring {
         // }
 
         Self {
-            ring_mint,
+            trading_mint,
             ring_id,
             edges,
+            ring_ming_symbols,
             ring_state: Arc::new(RwLock::new(RingState::default())),
         }
     }
@@ -73,8 +75,8 @@ impl Ring {
         self.ring_id.clone()
     }
 
-    pub fn get_ring_mint(&self) -> Pubkey {
-        self.ring_mint
+    pub fn get_trading_mint(&self) -> Pubkey {
+        self.trading_mint
     }  
 
     pub fn compute_out_amount(&self,

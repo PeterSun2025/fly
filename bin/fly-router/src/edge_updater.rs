@@ -3,7 +3,7 @@ use crate::edge::Edge;
 // 引入自定义的指标模块
 use crate::metrics;
 // 引入自定义的代币缓存模块
-use crate::token_cache::TokenCache;
+use crate::source::token_cache::TokenCache;
 // 引入自定义的工具函数，用于生成 Tokio 任务
 use crate::util::tokio_spawn;
 // 引入锚点库中的 SPL 代币模块
@@ -101,7 +101,7 @@ struct EdgeUpdater {
     // 链上数据视图
     chain_data: AccountProviderView,
     // 代币缓存
-    token_cache: TokenCache,
+    token_cache: Arc<TokenCache>,
     // 价格缓存
     price_cache: PriceCache,
     // 准备就绪信号发送器
@@ -123,7 +123,7 @@ pub fn spawn_updater_job(
     dex: &Dex,
     config: &Config,
     chain_data: AccountProviderView,
-    token_cache: TokenCache,
+    token_cache: Arc<TokenCache>,
     price_cache: PriceCache,
     path_warming_amounts: Vec<u64>,
     register_mint_sender: async_channel::Sender<Pubkey>,

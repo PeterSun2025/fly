@@ -33,7 +33,7 @@ const TOKEN_PROGRAM_ID: Pubkey = spl_token::ID;
 static MEMO_PROGRAM_ID: Lazy<Pubkey> = Lazy::new(|| {
     Pubkey::from_str("Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo").unwrap()
 });
-const DEFAULT_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS: u64 = 10_000;
+//const DEFAULT_COMPUTE_UNIT_PRICE_MICRO_LAMPORTS: u64 = 10_000;
 static JITO_TIP_ACCOUNTS: Lazy<[Pubkey; 8]> = Lazy::new(|| [
     Pubkey::from_str("3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT").unwrap(),
     Pubkey::from_str("96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5").unwrap(),
@@ -44,7 +44,7 @@ static JITO_TIP_ACCOUNTS: Lazy<[Pubkey; 8]> = Lazy::new(|| [
     Pubkey::from_str("ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt").unwrap(),
     Pubkey::from_str("DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL").unwrap(),
 ]);
-const JITO_MAX_TIP: u64 = 10_000_000;
+//const JITO_MAX_TIP: u64 = 10_000_000;
 
 
 pub struct JitoIxSender <THashProvider: HashProvider + Send + Sync + 'static,> {
@@ -507,7 +507,7 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> JitoIxSender<THashProv
         } else {
             // 使用配置的 TIP 比例
             let compute_tip = (profit as f64 * self.jito_tip_bps as f64) as u64;
-            compute_tip.min(JITO_MAX_TIP)
+            compute_tip.min(self.jito_max_tip)
         }
     }
 

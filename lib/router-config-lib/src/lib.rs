@@ -78,7 +78,7 @@ pub struct SafetyCheckConfig {
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
 pub struct DexConfig {
     pub enabled: bool,
-    pub mints: Vec<String>,
+    //pub mints: Vec<String>,
     pub add_mango_tokens: bool,
     pub take_all_mints: bool,
 }
@@ -101,6 +101,7 @@ pub struct AccountDataSourceConfig {
     pub dedup_queue_size: usize,
     pub request_timeout_in_seconds: Option<u64>,
     pub number_of_accounts_per_gma: Option<usize>,
+    pub birdeye_token: String,
 }
 
 #[derive(Clone, Debug, serde_derive::Deserialize)]
@@ -134,6 +135,7 @@ pub struct RoutingConfig {
     pub retain_path_count: Option<usize>,
     pub max_edge_per_pair: Option<usize>,
     pub max_edge_per_cold_pair: Option<usize>,
+    
 }
 
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
@@ -219,7 +221,7 @@ pub fn string_or_env(value_or_env: String) -> String {
 
 #[derive(Clone, Debug, Default, serde_derive::Deserialize)]
 pub struct RingConfig {
-    pub ring_mints: Option<Vec<String>>,
+    pub trading_mints: Option<Vec<String>>,
     pub max_path_length: Option<usize>,
     
 }

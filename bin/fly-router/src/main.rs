@@ -3,6 +3,7 @@ use std::process::exit;
 use std::sync::RwLockWriteGuard;
 use std::time::{Duration, Instant};
 use std::sync::atomic::Ordering;
+use anchor_spl::mint;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use routing_types::Route;
@@ -15,8 +16,8 @@ use num_cpus;
 
 use crate::edge_updater::{spawn_updater_job, Dex};
 use crate::util::tokio_spawn;
-use crate::source::mint_accounts_source::{request_mint_metadata, Token};
-use crate::token_cache::{Decimals, TokenCache};
+use crate::source::token_cache::{Decimals, TokenCache,Token};
+use crate::source::mint_accounts_source::request_v24h_usd_mint_metadata_by_birdeye;
 use crate::hot_mints::HotMintsCache;
 
 use crate::ix_builder::{SwapInstructionsBuilderImpl, SwapStepInstructionBuilderImpl};
@@ -91,7 +92,7 @@ async fn main() -> Result<()> {
     
     //读取配置文件路径参数 参考  启动命令 RUST_LOG=info router my_config.toml
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
+    if args.len() < 3 {
         eprintln!("Please enter a config file path argument.");
         return Ok(());
     }
@@ -104,9 +105,8 @@ async fn main() -> Result<()> {
         panic!("Failed to read password");
 
     });
-    let private_key = myrust::mycrypt::decrypt(&encrypted_private_key, &password).unwrap_or_else(|_| {
-        panic!("Failed to decrypt private key");
-    });
+    
+    let private_key = myrust::mycrypt::my_decrypt(&encrypted_private_key, &password);
     let keypair = Keypair::from_base58_string(&private_key);
     info!("pubkey: {:?}", keypair.pubkey().to_string());  // 添加密钥加载日志
     let _ = encrypted_private_key.trim();
@@ -157,6 +157,22 @@ async fn main() -> Result<()> {
             exit_sender.send(()).unwrap();
         });
     }
+
+    let birdeye_token = source_config.birdeye_token.clone();
+    
+    let token_cache = {
+            let mint_metadata = request_v24h_usd_mint_metadata_by_birdeye(
+                birdeye_token,
+            )
+            .await;
+            // let mut data: HashMap<Pubkey, Token> = HashMap::new();
+            // for (mint_pubkey, Token { mint, decimals, symbol}) in mint_metadata {
+            //     assert_eq!(mint_pubkey, mint);
+            //     data.insert(mint_pubkey, decimals as Decimals);
+            // }
+            TokenCache::new(mint_metadata)
+        };
+    let token_cache = Arc::new(token_cache);
 
     //初始化一些通道
     // async_channel::unbounded() 是一个异步通道，用于在不同的任务之间传递消息。它是无界的，意味着它可以存储任意数量的消息，直到内存耗尽。
@@ -254,54 +270,59 @@ async fn main() -> Result<()> {
         gpa_compression_enabled,
     };
 
+    let token_cache_mints = token_cache.string_tokens();
+
     let dexs: Vec<Dex> = [
         dex::generic::build_dex!(
             OrcaDex::initialize(&mut router_rpc, orca_config,config.orca.take_all_mints,
-                &config.orca.mints).await?,
+                //&config.orca.mints
+                &token_cache_mints
+            ).await?,
             &mango_data,
             config.orca.enabled,
             config.orca.add_mango_tokens,
             config.orca.take_all_mints,
-            &config.orca.mints
+            //&config.orca.mints
+            &token_cache_mints
         ),
         dex::generic::build_dex!(
             OrcaDex::initialize(&mut router_rpc, cropper,
                 config.cropper.take_all_mints,
-                &config.cropper.mints).await?,
+                &token_cache_mints).await?,
             &mango_data,
             config.cropper.enabled,
             config.cropper.add_mango_tokens,
             config.cropper.take_all_mints,
-            &config.cropper.mints
+            &token_cache_mints
         ),
         dex::generic::build_dex!(
             dex_saber::SaberDex::initialize(&mut router_rpc, HashMap::new(),
             config.saber.take_all_mints,
-            &config.saber.mints).await?,
+            &token_cache_mints).await?,
             &mango_data,
             config.saber.enabled,
             config.saber.add_mango_tokens,
             config.saber.take_all_mints,
-            &config.saber.mints
+            &token_cache_mints
         ),
         dex::generic::build_dex!(
             dex_raydium_cp::RaydiumCpDex::initialize(&mut router_rpc, HashMap::new(),
             config.raydium_cp.take_all_mints,
-            &config.raydium_cp.mints).await?,
+            &token_cache_mints).await?,
             &mango_data,
             config.raydium_cp.enabled,
             config.raydium_cp.add_mango_tokens,
             config.raydium_cp.take_all_mints,
-            &config.raydium_cp.mints
+            &token_cache_mints
         ),
         dex::generic::build_dex!(
             dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),config.raydium.take_all_mints,
-            &config.raydium.mints).await?,
+            &token_cache_mints).await?,
             &mango_data,
             config.raydium.enabled,
             config.raydium.add_mango_tokens,
             config.raydium.take_all_mints,
-            &config.raydium.mints
+            &token_cache_mints
         ),
         // dex::generic::build_dex!(
         //     dex_openbook_v2::OpenbookV2Dex::initialize(&mut router_rpc, HashMap::new(),).await?,
@@ -346,20 +367,21 @@ async fn main() -> Result<()> {
         info!("Edge: {:?}  || desc:{} ", edge.unique_id(), edge.desc());
     }
 
-    let token_cache = {
-        let mint_metadata = request_mint_metadata(
-            &source_config.rpc_http_url,
-            &mints,
-            number_of_accounts_per_gma,
-        )
-        .await;
-        let mut data: HashMap<Pubkey, token_cache::Decimals> = HashMap::new();
-        for (mint_pubkey, Token { mint, decimals }) in mint_metadata {
-            assert_eq!(mint_pubkey, mint);
-            data.insert(mint_pubkey, decimals as Decimals);
-        }
-        TokenCache::new(data)
-    };
+    //修改为从birdeye接口获取24小时成交量最大的前50个币种
+    // let token_cache = {
+    //     let mint_metadata = request_mint_metadata(
+    //         &source_config.rpc_http_url,
+    //         &mints,
+    //         number_of_accounts_per_gma,
+    //     )
+    //     .await;
+    //     let mut data: HashMap<Pubkey, token_cache::Decimals> = HashMap::new();
+    //     for (mint_pubkey, Token { mint, decimals, symbol}) in mint_metadata {
+    //         assert_eq!(mint_pubkey, mint);
+    //         data.insert(mint_pubkey, decimals as Decimals);
+    //     }
+    //     TokenCache::new(data)
+    // };
 
 
     
@@ -484,6 +506,7 @@ async fn main() -> Result<()> {
         &config,
   //      ready_sender,  
         chain_data_wrapper.clone(),
+        token_cache.clone(),
         path_warming_amounts,
         edges.clone(),
         edge_price_updates,

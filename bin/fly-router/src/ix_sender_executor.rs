@@ -130,7 +130,7 @@ impl<
         if jito_regions.is_empty() {
             jito_regions = vec!["frankfurt".to_string()]; // 默认区域
         }
-        let region_send_type = config.sender.region_send_type.clone().unwrap_or_default(); // Jito区域发送类型
+        let region_send_type = config.sender.region_send_type.clone().unwrap_or("serial".to_string()); // Jito区域发送类型
 
         let ix_sender = generate_ix_sender(
             send_mode,
@@ -282,6 +282,7 @@ pub async fn spawn_sender_executor_job<
                         Ok(route) => {
                             // let gain = route.out_amount - route.in_amount;
                             let swap = executor.build_swap_tx(route.clone()).await;
+                            info!("swap tx: {:?}", swap);
                             match swap {
                                 Ok(swap) => {
                                     let swap = Arc::new(swap);
@@ -289,7 +290,8 @@ pub async fn spawn_sender_executor_job<
                                     match transactions {
                                         Ok(transactions) => {
                                             // 发送交易
-                                            executor.ix_sender.send_tx(transactions);
+                                            info!("sending transaction: {:?}", transactions);
+                                            //let _ = executor.ix_sender.send_tx(transactions);
                                         }
                                         Err(e) => {
                                             error!("Failed to extend instruction: {:?}", e);

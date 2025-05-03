@@ -2,6 +2,7 @@ use solana_program::instruction::Instruction;
 use solana_program::pubkey::Pubkey;
 use std::collections::HashSet;
 
+#[derive(Debug, Clone)]
 pub struct Swap {
     pub setup_instructions: Vec<Instruction>,
     pub swap_instruction: Instruction,

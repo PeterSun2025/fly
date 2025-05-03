@@ -1,5 +1,5 @@
 [cropper]
-enabled = false
+enabled = true
 mints = [
     "So11111111111111111111111111111111111111112",  # SOL
     "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
@@ -13,16 +13,6 @@ take_all_mints = false
 add_mango_tokens = false
 
 [raydium_cp]
-enabled = false
-mints = [
-    "So11111111111111111111111111111111111111112",  # SOL
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
-     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
-]
-take_all_mints = false
-add_mango_tokens = false
-
-[raydium]
 enabled = true
 mints = [
     "So11111111111111111111111111111111111111112",  # SOL
@@ -32,8 +22,18 @@ mints = [
 take_all_mints = false
 add_mango_tokens = false
 
-[orca]
+[raydium]
 enabled = false
+mints = [
+    "So11111111111111111111111111111111111111112",  # SOL
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", # USDC
+     "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", # USDT
+]
+take_all_mints = false
+add_mango_tokens = false
+
+[orca]
+enabled = true
 mints = []
 take_all_mints = false
 add_mango_tokens = false
@@ -74,6 +74,7 @@ dedup_queue_size = 50000
 rpc_http_url = "https://solana-rpc.publicnode.com/"
 #rpc_http_url = "http://37.61.215.175:8899"
 rpc_support_compression = false
+birdeye_token = "c51d6be19e8947248d6d6bd6b52d8feb"
 
 [[sources.grpc_sources]]
 name = "accountsdb-client"
@@ -86,3 +87,6 @@ birdeye_token = "<TOKEN>"
 refresh_interval_secs = 600 # every 30 min  为什么默认给30分钟？
 
 [ring]
+
+[sender]
+name="fly-test"
