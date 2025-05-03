@@ -71,7 +71,6 @@ mod hot_mints;
 mod source;
 mod swap;
 mod syscallstubs;
-mod token_cache;
 
 pub mod graph;
 

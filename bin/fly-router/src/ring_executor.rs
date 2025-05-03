@@ -251,23 +251,6 @@ pub fn spawn_ring_executor_job(
         route_sender,
     );
 
-    // // Spawn the executor job
-    // Some(tokio::spawn(async move {
-    //     loop {
-    //         tokio::select! {
-    //             _ = exit.recv() => {
-    //                 info!("shutting down ring executor task,mints");
-    //                 break;
-    //             }
-    //             edge = edge_price_updates.recv() => {
-    //                 ring_executor.do_dirty_ring(edge.unwrap_or_else(|_| {
-    //                     panic!("Error receiving edge price update")
-    //                 }));
-    //             },
-    //         }
-    //     }
-    // }))
-
 
     // 获取初始化超时时间，默认为 5 分钟
     let init_timeout_in_seconds = config.snapshot_timeout_in_seconds.unwrap_or(60);
