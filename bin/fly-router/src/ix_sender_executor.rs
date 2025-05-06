@@ -263,7 +263,7 @@ pub async fn spawn_sender_executor_job<
     // .map_err(|_| anyhow::Error::msg("Invalid SwapMode"))?;
 
     executor.state.is_ready = true;
-    info!("sender executor is ready");
+    //info!("sender executor is ready");
 
     // 生成 Tokio 任务
     let listener_job = tokio_spawn("sender_executor", async move {
@@ -281,6 +281,7 @@ pub async fn spawn_sender_executor_job<
                     match route {
                         Ok(route) => {
                             // let gain = route.out_amount - route.in_amount;
+                            info!("route: {:?}", route.display_steps());
                             let swap = executor.build_swap_tx(route.clone()).await;
                             info!("swap tx: {:?}", swap);
                             match swap {
@@ -291,7 +292,7 @@ pub async fn spawn_sender_executor_job<
                                         Ok(transactions) => {
                                             // 发送交易
                                             info!("sending transaction: {:?}", transactions);
-                                            //let _ = executor.ix_sender.send_tx(transactions);
+                                            let _ = executor.ix_sender.send_tx(transactions).await;
                                         }
                                         Err(e) => {
                                             error!("Failed to extend instruction: {:?}", e);

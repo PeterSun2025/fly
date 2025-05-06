@@ -121,7 +121,7 @@ pub trait DexEdgeIdentifier: Sync + Send {
     fn as_any(&self) -> &dyn Any;
 }
 
-pub trait DexEdge {
+pub trait DexEdge: Sync + Send {
     fn as_any(&self) -> &dyn Any;
 }
 

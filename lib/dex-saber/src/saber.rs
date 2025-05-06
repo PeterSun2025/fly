@@ -45,6 +45,12 @@ impl DexInterface for SaberDex {
 
         let edge_pairs = pools
             .iter()
+            //增加对池的过滤，避免请求过多的账户，如果不是加载所有mints，只加载mints中包含的池
+            .filter(|(_pool_pk, pool)| {
+                let keep = take_all_mints
+                    || (mints.contains(&pool.token_a.mint.to_string()) && mints.contains(&pool.token_b.mint.to_string()));
+                keep
+            })
             .map(|(pool_pk, pool)| {
                 (
                     Arc::new(SaberEdgeIdentifier {

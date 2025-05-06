@@ -20,8 +20,14 @@ lazy_static::lazy_static! {
         register_int_counter_vec!(opts!("router_account_snapshots", "Number of account snapshots"), &["snapshot_type"]).unwrap();
     pub static ref GRPC_SNAPSHOT_ACCOUNT_WRITES: IntCounter =
         register_int_counter!("router_snapshot_account_writes", "Number of account writes from snapshot").unwrap();
-     pub static ref GRPC_SOURCE_CONNECTION_RETRIES: IntCounterVec =
+    pub static ref GRPC_SOURCE_CONNECTION_RETRIES: IntCounterVec =
         register_int_counter_vec!(opts!("grpc_source_connection_retries", "gRPC source connection retries"), &["source_name"]).unwrap();
+    // add by @isaac 2025-5-4
+    pub static ref GRPC_SOURCE_PING_FAILED: IntCounterVec =
+        register_int_counter_vec!(opts!("grpc_source_ping_retries", "gRPC source ping retries"), &["source_name"]).unwrap();
+    pub static ref GRPC_SOURCE_PING_SUCCESS: IntCounterVec =
+        register_int_counter_vec!(opts!("grpc_source_ping_success", "gRPC source ping retries"), &["source_name"]).unwrap();
+    
     pub static ref GRPC_NO_MESSAGE_FOR_DURATION_MS: IntGauge =
         register_int_gauge!("grpc_no_update_for_duration_ms", "Did not get any message from Geyser gPRC for this duration").unwrap();
     pub static ref GRPC_TO_EDGE_SLOT_LAG: IntGaugeVec =

@@ -5,6 +5,7 @@ use jsonrpc_core::futures::StreamExt;
 use solana_sdk::pubkey::Pubkey;
 
 use tokio_stream::StreamMap;
+use yellowstone_grpc_client::GeyserGrpcClient;
 use yellowstone_grpc_proto::tonic::{
     metadata::MetadataValue,
     transport::{Channel, ClientTlsConfig},
@@ -20,8 +21,8 @@ use std::{collections::HashMap, env, time::Duration};
 use tracing::*;
 
 use yellowstone_grpc_proto::prelude::{
-    geyser_client::GeyserClient, subscribe_update, CommitmentLevel, SubscribeRequest,
-    SubscribeRequestFilterAccounts, SubscribeRequestFilterSlots,
+    geyser_client::GeyserClient, subscribe_update, subscribe_update::UpdateOneof, CommitmentLevel,
+    SubscribeRequest, SubscribeRequestFilterAccounts, SubscribeRequestFilterSlots,SubscribeRequestPing,
 };
 
 use crate::metrics;
@@ -34,11 +35,11 @@ use router_feed_lib::get_program_account::{
 };
 use router_feed_lib::utils::make_tls_config;
 use solana_program::clock::Slot;
-use tokio::sync::Semaphore;
+use tokio::{sync::Semaphore, time::interval};
 use yellowstone_grpc_proto::geyser::subscribe_request_filter_accounts_filter::Filter;
 use yellowstone_grpc_proto::geyser::{
     subscribe_request_filter_accounts_filter_memcmp, SubscribeRequestFilterAccountsFilter,
-    SubscribeRequestFilterAccountsFilterMemcmp, SubscribeUpdateAccountInfo, SubscribeUpdateSlot,
+    SubscribeRequestFilterAccountsFilterMemcmp, SubscribeUpdateAccountInfo, SubscribeUpdateSlot,PingRequest,
 };
 use yellowstone_grpc_proto::tonic::codec::CompressionEncoding;
 
@@ -195,7 +196,7 @@ pub async fn feed_data_geyser(
             slots,
             transactions,
             accounts_data_slice: vec![],
-            ping: None,
+            ping: None,//TODO:为什么ping是None？
             ..Default::default()
         };
         let response = client.subscribe(once(async move { request })).await?;
@@ -214,7 +215,7 @@ pub async fn feed_data_geyser(
             accounts,
             commitment: Some(CommitmentLevel::Processed as i32),
             accounts_data_slice: vec![],
-            ping: None,
+            ping: None,//TODO:为什么ping是None？
             ..Default::default()
         };
         let response = client.subscribe(once(async move { request })).await?;
@@ -288,6 +289,9 @@ pub async fn feed_data_geyser(
 
     let mut last_message_received_at = Instant::now();
 
+    // //增加ping 2025-05-04
+    let mut timer = interval(Duration::from_secs(5));
+    let mut ping_id = 0;
     loop {
         tokio::select! {
             update = subscriptions.next() => {
@@ -300,16 +304,18 @@ pub async fn feed_data_geyser(
                 // use account and slot updates to trigger snapshot loading
                 match &update.update_oneof {
                     Some(UpdateOneof::Slot(slot_update)) => {
+                        //trace!("received slot update for slot {}", slot_update.slot);
                         trace!("received slot update for slot {}", slot_update.slot);
                         let status = slot_update.status;
 
-                        debug!(
+                        trace!(
                             "slot_update: {} ({})",
                             slot_update.slot,
                             slot_update.status
                         );
 
-                        if status == CommitmentLevel::Finalized as i32 {
+                        //if status == CommitmentLevel::Finalized as i32 {
+                        if status == CommitmentLevel::Confirmed as i32 {
                             if first_full_slot == u64::MAX {
                                 // TODO: is this equivalent to before? what was highesy_write_slot?
                                 first_full_slot = slot_update.slot + 1;
@@ -393,7 +399,8 @@ pub async fn feed_data_geyser(
                     },
                     Some(UpdateOneof::Account(info)) => {
                         let slot = info.slot;
-                        trace!("received account update for slot {}", slot);
+                       // trace!("received account update for slot {}", slot);
+                       trace!("received account update for slot {}", slot);
                         if slot < first_full_slot {
                             // Don't try to process data for slots where we may have missed writes:
                             // We could not map the write_version correctly for them.
@@ -431,7 +438,16 @@ pub async fn feed_data_geyser(
                         write_version_mapping.per_slot_write_version += 1;
                     },
                     Some(UpdateOneof::Ping(_)) => {
-                        trace!("received grpc ping");
+                        //trace!("received grpc ping");
+                        info!("received grpc ping");
+                        // //增加ping 2025-05-04
+                            timer.tick().await;
+                            ping_id += 1;
+                            let _ = client.ping(Request::new(PingRequest { count:ping_id })).await
+                                .map_err(anyhow::Error::new)
+                                .map(|response| info!("ping response: {response:?}"));
+
+                       
                     },
                     Some(_) => {
                         // ignore all other grpc update types
@@ -463,7 +479,12 @@ pub async fn feed_data_geyser(
                     anyhow::bail!("snapshot channel closed");
                 };
                 let snapshot = snapshot_result?;
-                debug!("snapshot (program={}, m_accounts={}) is for slot {}, first full slot was {}",
+                // debug!("snapshot (program={}, m_accounts={}) is for slot {}, first full slot was {}",
+                //     snapshot.program_id.map(|x| x.to_string()).unwrap_or("none".to_string()),
+                //     snapshot.accounts.len(),
+                //     snapshot.slot,
+                //     first_full_slot);
+                info!("snapshot (program={}, m_accounts={}) is for slot {}, first full slot was {}",
                     snapshot.program_id.map(|x| x.to_string()).unwrap_or("none".to_string()),
                     snapshot.accounts.len(),
                     snapshot.slot,
@@ -591,6 +612,34 @@ pub async fn process_events(
         }));
     }
 
+    // let mut source_ping_jobs = vec![];
+
+    // for grpc_source in grpc_sources.clone() {
+    //     let grpc_source = grpc_source.clone();
+    //     let grpc_source_name = grpc_source.name.clone();
+    //     let grpc_source_url = grpc_source.connection_string.clone();
+    //     source_ping_jobs.push(tokio::spawn(async move {
+    //         loop {
+
+    //             let out = grpc_ping(&grpc_source, None).await;
+    //             if out.is_err() {
+    //                 error!("ping to {} failed: {:?}", grpc_source_url, out);
+    //                 metrics::GRPC_SOURCE_PING_FAILED
+    //                     .with_label_values(&[&grpc_source_name])
+    //                     .inc();
+    //             } else {
+    //                 metrics::GRPC_SOURCE_PING_SUCCESS
+    //                     .with_label_values(&[&grpc_source_name])
+    //                     .inc();
+    //             }
+    //             tokio::time::sleep(std::time::Duration::from_secs(
+    //                 grpc_source.retry_connection_sleep_secs,
+    //             ))
+    //             .await;
+    //         }
+    //     }));
+    // }
+
     // slot -> (pubkey -> write_version)
     //
     // To avoid unnecessarily sending requests to SQL, we track the latest write_version
@@ -602,6 +651,7 @@ pub async fn process_events(
     let latest_write_retention = 50;
 
     let mut source_jobs: futures::stream::FuturesUnordered<_> = source_jobs.into_iter().collect();
+   // let mut source_ping_jobs: futures::stream::FuturesUnordered<_> = source_ping_jobs.into_iter().collect();
 
     loop {
         tokio::select! {
@@ -609,6 +659,9 @@ pub async fn process_events(
                 warn!("shutting down grpc_plugin_source because subtask failed...");
                 break;
             },
+            // _ = source_ping_jobs.next() => {
+            //     // ping task finished, ignore it
+            // },
             _ = exit.recv() => {
                 warn!("shutting down grpc_plugin_source...");
                 break;
@@ -784,4 +837,78 @@ async fn process_account_updated_from_sources(
             }
         }
     }
+}
+
+async fn grpc_ping(
+    grpc_config: &GrpcSourceConfig,
+    tls_config: Option<ClientTlsConfig>,
+) -> anyhow::Result<()> {
+    let grpc_connection_string = match &grpc_config.connection_string.chars().next().unwrap() {
+        '$' => env::var(&grpc_config.connection_string[1..])
+            .expect("reading connection string from env"),
+        _ => grpc_config.connection_string.clone(),
+    };
+
+    let endpoint = Channel::from_shared(grpc_connection_string)?;
+    let channel = if let Some(tls) = tls_config {
+        endpoint.tls_config(tls)?
+    } else {
+        endpoint
+    } 
+    .tcp_nodelay(true)
+    .http2_adaptive_window(true)
+    .buffer_size(GPRC_CLIENT_BUFFER_SIZE)
+    .initial_connection_window_size(GRPC_CONN_WINDOW)
+    .initial_stream_window_size(GRPC_STREAM_WINDOW)
+    .connect()
+    .await?;
+
+    let token: Option<MetadataValue<_>> = match &grpc_config.token {
+        Some(token) => {
+            if token.is_empty() {
+                None
+            } else {
+                match token.chars().next().unwrap() {
+                    '$' => Some(
+                        env::var(&token[1..])
+                            .expect("reading token from env")
+                            .parse()?,
+                    ),
+                    _ => Some(token.clone().parse()?),
+                }
+            }
+        }
+        None => None,
+    };
+    let mut client = GeyserClient::with_interceptor(channel, move |mut req: Request<()>| {
+        if let Some(token) = &token {
+            req.metadata_mut().insert("x-token", token.clone());
+        }
+        Ok(req)
+    });
+    
+    futures::try_join!(
+        async move {
+            // let mut stream = client.subscribe(once(async move {
+            //     SubscribeRequest {
+            //         ping: Some(SubscribeRequestPing { id: 1 }),
+            //         ..Default::default()
+            //     }
+            // })).await?.into_inner();
+
+            let mut timer = interval(Duration::from_secs(5));
+            let mut id = 0;
+            loop {
+                timer.tick().await;
+                id += 1;
+                let _ = client.ping(Request::new(PingRequest { count:id })).await
+                    .map_err(anyhow::Error::new)
+                    .map(|response| info!("ping response: {response:?}"));
+            }
+            #[allow(unreachable_code)]
+            Ok::<(), anyhow::Error>(())
+        }
+    )?;
+
+    Ok(())
 }

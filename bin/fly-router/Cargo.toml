@@ -54,6 +54,8 @@ get_if_addrs = "0.5"
 # serum_dex = { workspace = true, features = ["no-entrypoint", "program"] }
 sha2 = "0.10.6"
 shellexpand = "2.1.0"
+dashmap = "5.3"
+rayon = "1.7"
 
 # solana-address-lookup-table-program = "1.17"
 solana-account-decoder = "1.17"

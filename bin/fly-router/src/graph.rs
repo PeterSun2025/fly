@@ -556,6 +556,8 @@ mod tests {
         let edge = Edge {
             input_mint: input_mint.clone(),
             output_mint: output_mint.clone(),
+            input_mint_symbol: "USDC".to_string(),
+            output_mint_symbol: "SOL".to_string(),
             dex: dex.clone(),
             id: Arc::new(MockDexIdentifier {
                 key: key.clone(),

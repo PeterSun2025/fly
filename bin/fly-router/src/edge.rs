@@ -48,6 +48,10 @@ pub struct Edge {
     pub input_mint: Pubkey,
     // 输出代币的铸币公钥
     pub output_mint: Pubkey,
+
+    pub input_mint_symbol: String,
+    pub output_mint_symbol: String,
+
     // 对实现了 DexInterface 特性的 DEX 的原子引用
     pub dex: Arc<dyn DexInterface>,
     // 对实现了 DexEdgeIdentifier 特性的边标识符的原子引用
@@ -69,11 +73,15 @@ impl std::fmt::Debug for Edge {
         write!(
             f,
             "{} => {} ({})",
-            // 使用调试工具获取输入铸币公钥的名称
-            debug_tools::name(&self.input_mint),
-            // 使用调试工具获取输出铸币公钥的名称
-            debug_tools::name(&self.output_mint),
-            // 获取 DEX 的名称
+            // // 使用调试工具获取输入铸币公钥的名称
+            // debug_tools::name(&self.input_mint),
+            // // 使用调试工具获取输出铸币公钥的名称
+            // debug_tools::name(&self.output_mint),
+            // // 获取 DEX 的名称
+            self.input_mint_symbol,
+            //self.input_mint,
+            self.output_mint_symbol,
+            //self.output_mint,
             self.dex.name()
         )
     }

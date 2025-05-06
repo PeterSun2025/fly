@@ -84,7 +84,7 @@ mod test_utils;
 
 
 
-#[tokio::main(flavor = "multi_thread", worker_threads = 16)]
+#[tokio::main(flavor = "multi_thread", worker_threads = 90)]
 async fn main() -> Result<()> {
     router_feed_lib::utils::tracing_subscriber_init();
     //设置日志级别
@@ -261,7 +261,7 @@ async fn main() -> Result<()> {
     );
     cropper.insert("program_name".to_string(), "Cropper".to_string());
 
-    let gpa_compression_enabled = source_config.rpc_support_compression.unwrap_or_default();
+    let gpa_compression_enabled = source_config.rpc_support_compression.unwrap_or(false);
     let mut router_rpc = RouterRpcClient {
         rpc: Box::new(RouterRpcWrapper {
             rpc: build_rpc(&source_config),
@@ -279,6 +279,7 @@ async fn main() -> Result<()> {
                 &token_cache_mints
             ).await?,
             &mango_data,
+            token_cache.clone(),
             config.orca.enabled,
             config.orca.add_mango_tokens,
             config.orca.take_all_mints,
@@ -290,6 +291,7 @@ async fn main() -> Result<()> {
                 config.cropper.take_all_mints,
                 &token_cache_mints).await?,
             &mango_data,
+            token_cache.clone(),
             config.cropper.enabled,
             config.cropper.add_mango_tokens,
             config.cropper.take_all_mints,
@@ -300,6 +302,7 @@ async fn main() -> Result<()> {
             config.saber.take_all_mints,
             &token_cache_mints).await?,
             &mango_data,
+            token_cache.clone(),
             config.saber.enabled,
             config.saber.add_mango_tokens,
             config.saber.take_all_mints,
@@ -310,6 +313,7 @@ async fn main() -> Result<()> {
             config.raydium_cp.take_all_mints,
             &token_cache_mints).await?,
             &mango_data,
+            token_cache.clone(),
             config.raydium_cp.enabled,
             config.raydium_cp.add_mango_tokens,
             config.raydium_cp.take_all_mints,
@@ -319,6 +323,7 @@ async fn main() -> Result<()> {
             dex_raydium::RaydiumDex::initialize(&mut router_rpc, HashMap::new(),config.raydium.take_all_mints,
             &token_cache_mints).await?,
             &mango_data,
+            token_cache.clone(),
             config.raydium.enabled,
             config.raydium.add_mango_tokens,
             config.raydium.take_all_mints,
@@ -363,9 +368,9 @@ async fn main() -> Result<()> {
     .collect();
     info!("Using {} mints,{} edges.", mints.len(),edges.len());
 
-    for edge in edges.iter() {
-        info!("Edge: {:?}  || desc:{} ", edge.unique_id(), edge.desc());
-    }
+    // for edge in edges.iter() {
+    //     info!("Edge: {:?}  || desc:{} ", edge.unique_id(), edge.desc());
+    // }
 
     //修改为从birdeye接口获取24小时成交量最大的前50个币种
     // let token_cache = {
@@ -588,7 +593,7 @@ async fn main() -> Result<()> {
 fn build_rpc(source_config: &AccountDataSourceConfig) -> RpcClient {
     RpcClient::new_with_timeouts_and_commitment(
         string_or_env(source_config.rpc_http_url.clone()),
-        Duration::from_secs(source_config.request_timeout_in_seconds.unwrap_or(60)), // request timeout
+        Duration::from_secs(source_config.request_timeout_in_seconds.unwrap_or(600)), // request timeout
         CommitmentConfig::confirmed(),
         Duration::from_secs(60), // confirmation timeout
     )

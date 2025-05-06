@@ -77,8 +77,7 @@ pub async fn get_source_atas(
             owner,
             TokenAccountsFilter::ProgramId(spl_token::ID),
             CommitmentConfig::confirmed(),
-        ).await?;
-        println!("token_accounts value: {:?}", token_accounts.value);   
+        ).await?;  
     let source_atas = token_accounts.value
         .into_iter()
         .filter_map(|kv| {

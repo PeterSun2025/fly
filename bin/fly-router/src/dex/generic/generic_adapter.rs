@@ -8,16 +8,19 @@ use tracing::info;
 
 use crate::edge::Edge;
 use crate::edge_updater::Dex;
+use crate::source::token_cache::TokenCache;
 use crate::utils;
 
 #[macro_export]
 macro_rules! build_dex {
-    ($dex_builder:expr, $metadata:expr, $enabled:expr, $add_mango_tokens:expr, $take_all_mints:expr, $mints:expr) => {
+    ($dex_builder:expr, $metadata:expr, $token_cache:expr, $enabled:expr, $add_mango_tokens:expr, $take_all_mints:expr, $mints:expr) => {
         if $enabled {
             let dex = $dex_builder;
+            let token_cache = $token_cache.clone();
             let result = crate::dex::generic::build_dex_internal(
                 dex,
                 $metadata,
+                token_cache,
                 $enabled,
                 $add_mango_tokens,
                 $take_all_mints,
@@ -36,6 +39,7 @@ pub(crate) use build_dex;
 pub async fn build_dex_internal(
     dex: Arc<dyn DexInterface>,
     mango_metadata: &Option<MangoMetadata>,
+    token_cache: Arc<TokenCache>,
     enabled: bool,
     add_mango_tokens: bool,
     take_all_mints: bool,
@@ -58,6 +62,8 @@ pub async fn build_dex_internal(
                 Arc::new(Edge {
                     input_mint: x.input_mint(),
                     output_mint: x.output_mint(),
+                    input_mint_symbol:token_cache.get_symbol_by_mint(x.input_mint()).unwrap_or(x.input_mint().to_string()),
+                    output_mint_symbol: token_cache.get_symbol_by_mint(x.output_mint()).unwrap_or(x.output_mint().to_string()),
                     accounts_needed: x.accounts_needed(),
                     dex: dex.clone(),
                     id: x,

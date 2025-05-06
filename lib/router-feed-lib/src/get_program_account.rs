@@ -16,7 +16,7 @@ use solana_client::{
 use solana_rpc_client_api::filter::{Memcmp, RpcFilterType};
 use solana_sdk::account::Account;
 use solana_sdk::{account::AccountSharedData, commitment_config::CommitmentConfig, pubkey::Pubkey};
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct CustomSnapshotProgramAccounts {
     pub slot: u64,
@@ -59,7 +59,9 @@ pub async fn get_snapshot_gta(
 
     let token_program = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap();
     let result =
-        get_compressed_program_account_rpc(&rpc_client, &HashSet::from([token_program]), config)
+        //TODO:源码为什么直接使用compressed？
+        //get_compressed_program_account_rpc(&rpc_client, &HashSet::from([token_program]), config)
+        get_uncompressed_program_account_rpc(&rpc_client, &HashSet::from([token_program]), config)
             .await?;
 
     Ok(CustomSnapshotProgramAccounts {
@@ -78,7 +80,9 @@ pub async fn get_snapshot_gpa(
     use_compression: bool,
 ) -> anyhow::Result<CustomSnapshotProgramAccounts> {
     let result = if use_compression {
-        get_compressed_program_account(rpc_http_url, &[*program_id].into_iter().collect()).await?
+        //get_compressed_program_account(rpc_http_url, &[*program_id].into_iter().collect()).await?
+        warn!("compressed gpa is not supported, using uncompressed gpa instead");
+        get_uncompressed_program_account(rpc_http_url, program_id.to_string()).await?
     } else {
         get_uncompressed_program_account(rpc_http_url, program_id.to_string()).await?
     };

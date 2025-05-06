@@ -48,13 +48,13 @@ impl DexInterface for RaydiumCpDex {
     where
         Self: Sized,
     {
-        info!( "Initializing RaydiumCpDex");
+        // info!( "Initializing RaydiumCpDex");
         let pools =
             fetch_raydium_account::<PoolState>(rpc, RaydiumCpSwap::id(), PoolState::LEN).await?;
         
         info!( "RaydiumCpDex Found {} pools", pools.len());
 
-        info!( "Fetching vaults accounts");
+        //info!( "Fetching vaults accounts");
         let vaults = pools
             .iter()
             //增加对池的过滤，避免请求过多的账户，如果不是加载所有mints，只加载mints中包含的池
@@ -68,7 +68,7 @@ impl DexInterface for RaydiumCpDex {
         //TODO 这里如果加载全部，有24万个vaults，想要将vaults拆分并发执行
         //但是拆分后会导致rpc的请求数过多，可能会被rpc拒绝，怎么优化？
         let vaults = rpc.get_multiple_accounts(&vaults).await?;
-        info!( "RaydiumCpDex Found {} vaults", vaults.len());
+        // info!( "RaydiumCpDex Found {} vaults", vaults.len());
         
         let banned_vaults = vaults
             .iter()
@@ -79,7 +79,7 @@ impl DexInterface for RaydiumCpDex {
             })
             .map(|x| x.0)
             .collect::<HashSet<_>>();
-        info!( "RaydiumCpDex Found {} banned vaults", banned_vaults.len());
+        // info!( "RaydiumCpDex Found {} banned vaults", banned_vaults.len());
         let pools = pools
             .iter()
             .filter(|(_pool_pk, pool)| {

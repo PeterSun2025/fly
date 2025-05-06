@@ -461,6 +461,8 @@ mod tests {
                         edge: Arc::new(Edge {
                             input_mint: in_mint,
                             output_mint: out_mint,
+                            input_mint_symbol:in_mint.to_string(),
+                            output_mint_symbol:out_mint.to_string(),
                             dex: Arc::new(MockDex {}),
                             id: Arc::new(MockId {}),
                             accounts_needed: 1,
@@ -504,6 +506,8 @@ mod tests {
                         edge: Arc::new(Edge {
                             input_mint: 1.to_pubkey(),
                             output_mint: 2.to_pubkey(),
+                            input_mint_symbol:1.to_string(),
+                            output_mint_symbol:2.to_string(),
                             accounts_needed: 1,
                             dex: Arc::new(MockDex {}),
                             id: Arc::new(MockId {}),
@@ -547,6 +551,8 @@ mod tests {
                         edge: Arc::new(Edge {
                             input_mint: 1.to_pubkey(),
                             output_mint: 2.to_pubkey(),
+                            input_mint_symbol:1.to_string(),
+                            output_mint_symbol:2.to_string(),
                             accounts_needed: 1,
                             dex: Arc::new(MockDex {}),
                             id: Arc::new(MockId {}),

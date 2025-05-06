@@ -184,3 +184,32 @@ impl Display for EdgeIndex {
         write!(f, "{}/ei", self.idx)
     }
 }
+
+impl Route {
+    pub fn display_steps(&self) -> String {
+        let mut result = String::new();
+        for step in &self.steps {
+            result.push_str(&format!(
+                "Step:{}: {} -> {}: {} -> {} 
+                ",
+                step.edge.dex.name(),
+                step.edge.input_mint_symbol,
+                step.edge.output_mint_symbol,
+                step.in_amount,
+                step.out_amount,
+            ));
+        }
+        result
+    }
+    pub fn display(&self) -> String {
+        format!(
+            "Route: {} -> {}: {} -> {} ({} bps)\n{}",
+            self.input_mint,
+            self.output_mint,
+            self.in_amount,
+            self.out_amount,
+            self.price_impact_bps,
+            self.display_steps()
+        )
+    }
+}   
