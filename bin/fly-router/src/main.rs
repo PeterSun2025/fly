@@ -78,6 +78,7 @@ pub mod graph;
 mod server;
 mod alt;
 pub mod ix_builder;
+pub mod jup_ix_builder;
 mod ix_sender_executor;
 mod sender;
 mod test_utils;
@@ -119,13 +120,15 @@ async fn main() -> Result<()> {
 
     //获取https://api.mngo.cloud/data/v4/group-metadata 中的mango_metadata 参数
     //如果没有 mango_metadata 参数，则使用 None 
-    let mango_data = match mango::mango_fetcher::fetch_mango_data().await {
-        Err(e) => {
-            error!("Failed to fetch mango metdata: {}", e);
-            None
-        }
-        Ok(metadata) => Some(metadata),
-    };
+    // let mango_data = match mango::mango_fetcher::fetch_mango_data().await {
+    //     Err(e) => {
+    //         error!("Failed to fetch mango metdata: {}", e);
+    //         None
+    //     }
+    //     Ok(metadata) => Some(metadata),
+    // };
+
+    let mango_data = None;
 
     //获取配置文件中的sources 参数
     let default_source_config = config

@@ -166,7 +166,7 @@ impl<
         }
     }
 
-    async fn build_swap_tx(&self, route: Arc<Route>) -> anyhow::Result<Swap> {
+    fn build_swap_tx(&self, route: Arc<Route>) -> anyhow::Result<Swap> {
 
         let ixs = self.ix_builder.build_ixs(
             &self.wallet_pk,
@@ -282,7 +282,7 @@ pub async fn spawn_sender_executor_job<
                         Ok(route) => {
                             // let gain = route.out_amount - route.in_amount;
                             info!("route: {:?}", route.display_steps());
-                            let swap = executor.build_swap_tx(route.clone()).await;
+                            let swap = executor.build_swap_tx(route.clone());
                             info!("swap tx: {:?}", swap);
                             match swap {
                                 Ok(swap) => {

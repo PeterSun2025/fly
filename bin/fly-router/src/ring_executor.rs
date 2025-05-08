@@ -243,7 +243,7 @@ impl RingExecutor {
                                 .map(Into::into)
                                 .unwrap_or(0);
 
-                            if gain > expected_gain.into() {
+                            if gain > i128::from(expected_gain) {
                                 best_route = Some((steps, out_amount, slot, gain));
                                 break;
                             }
