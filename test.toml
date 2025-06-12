@@ -91,3 +91,5 @@ refresh_interval_secs = 600 # every 30 min  为什么默认给30分钟？
 [sender]
 name = "fly-test"
 expected_gain = 100000
+jupiter_url = "http://5.10.219.2:9001"
+in_amounts = [10_00_000_000, 500_000_000, 100_000_000,50_000_000]

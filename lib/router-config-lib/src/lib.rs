@@ -242,4 +242,5 @@ pub struct SenderConfig {
     pub jito_max_tip: Option<u64>,
     pub jito_regions: Option<Vec<String>>,
     pub region_send_type: Option<String>,
+    pub jupiter_url: Option<String>,
 }

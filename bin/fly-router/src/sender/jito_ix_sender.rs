@@ -1,7 +1,11 @@
 use super::ix_sender::IxSender;
 use crate::{
     routing_types::Route,
-    server::{client_provider::ClientProvider, hash_provider::HashProvider},
+    server::{
+        alt_provider::{self, AltProvider},
+        client_provider::ClientProvider,
+        hash_provider::HashProvider,
+    },
     swap::Swap,
 };
 use anchor_lang::prelude::AccountMeta;
@@ -60,12 +64,15 @@ static JITO_TIP_ACCOUNTS: Lazy<[Pubkey; 8]> = Lazy::new(|| {
 });
 //const JITO_MAX_TIP: u64 = 10_000_000;
 
-pub struct JitoIxSender<THashProvider: HashProvider + Send + Sync + 'static> {
+pub struct JitoIxSender<
+    THashProvider: HashProvider + Send + Sync + 'static,
+    TAltProvider: AltProvider + Send + Sync + 'static,
+> {
     name: String,
     keypair: Keypair,
     public_key: Pubkey,
     source_ata: Pubkey,
-    alt_accounts: Vec<AddressLookupTableAccount>,
+    alt_provider: Arc<TAltProvider>,
     compute_unit_price_micro_lamports: u64,
     jito_tip_bps: f32,
     jito_max_tip: u64,
@@ -77,7 +84,11 @@ pub struct JitoIxSender<THashProvider: HashProvider + Send + Sync + 'static> {
     //send_counter: RwLock<SendCounter>,
 }
 #[async_trait]
-impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSender<THashProvider> {
+impl<
+        THashProvider: HashProvider + Send + Sync + 'static,
+        TAltProvider: AltProvider + Send + Sync + 'static,
+    > IxSender for JitoIxSender<THashProvider, TAltProvider>
+{
     async fn instructuin_extend(
         &self,
         swap: Arc<Swap>,
@@ -170,6 +181,13 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSen
             2039280 + 5000,
         ));
 
+        // 1.10 获取所有alt
+        let alt_accounts: Vec<AddressLookupTableAccount> = alt_provider::load_all_alts(
+            swap.address_lookup_table_addresses.clone(),
+            self.alt_provider.clone(),
+        )
+        .await;
+
         // 构建第二个交易的指令
         let mut ixs2 = vec![];
 
@@ -205,8 +223,8 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSen
 
         let tx2_v0_message = solana_sdk::message::v0::Message::try_compile(
             &destination_keypair.pubkey(),
-            ixs2.as_slice(),
-            self.alt_accounts.as_slice(),
+            &ixs2,
+            &alt_accounts,
             recent_blockhash,
         )?;
         let tx2_message = VersionedMessage::V0(tx2_v0_message);
@@ -224,8 +242,8 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSen
 
             let tx1_v0_message = solana_sdk::message::v0::Message::try_compile(
                 &self.public_key,
-                ixs1.as_slice(),
-                self.alt_accounts.as_slice(),
+                &ixs1,
+                &alt_accounts,
                 recent_blockhash,
             )?;
             let tx1_message = VersionedMessage::V0(tx1_v0_message);
@@ -240,18 +258,17 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSen
             for url in self.jito_urls.iter() {
                 let mut ixs1_copy = ixs1.clone();
                 let tx2_copy = tx2.clone();
-                let mut name = String::new();
-                if !self.name.is_empty() {
-                    name = self.name.clone() + "-" + url;
+                let name = if !self.name.is_empty() {
+                    self.name.clone() + "-" + url
                 } else {
-                    name = url.clone();
-                }
+                    url.clone()
+                };
                 ixs1_copy.push(self.create_memo_instruction(&name));
 
                 let tx1_v0_message = solana_sdk::message::v0::Message::try_compile(
                     &self.public_key,
-                    ixs1_copy.as_slice(),
-                    self.alt_accounts.as_slice(),
+                    &ixs1_copy,
+                    &alt_accounts,
                     recent_blockhash,
                 )?;
                 let tx1_message = VersionedMessage::V0(tx1_v0_message);
@@ -273,11 +290,15 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> IxSender for JitoIxSen
     }
 }
 
-impl<THashProvider: HashProvider + Send + Sync + 'static> JitoIxSender<THashProvider> {
+impl<
+        THashProvider: HashProvider + Send + Sync + 'static,
+        TAltProvider: AltProvider + Send + Sync + 'static,
+    > JitoIxSender<THashProvider, TAltProvider>
+{
     pub fn new(
         name: String,
         keypair: Keypair,
-        alt_accounts: Vec<AddressLookupTableAccount>,
+        alt_provider: Arc<TAltProvider>,
         compute_unit_price_micro_lamports: u64,
         jito_tip_bps: f32,
         jito_max_tip: u64,
@@ -303,7 +324,7 @@ impl<THashProvider: HashProvider + Send + Sync + 'static> JitoIxSender<THashProv
             keypair,
             public_key,
             source_ata,
-            alt_accounts,
+            alt_provider,
             compute_unit_price_micro_lamports,
             jito_tip_bps,
             jito_max_tip,

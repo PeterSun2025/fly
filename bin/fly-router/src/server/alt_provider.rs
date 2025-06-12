@@ -4,8 +4,9 @@ use solana_program::address_lookup_table::state::AddressLookupTable;
 use solana_program::address_lookup_table::AddressLookupTableAccount;
 use solana_program::pubkey::Pubkey;
 use std::collections::HashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+pub use std::str::FromStr;
 
 #[async_trait]
 pub trait AltProvider {
@@ -50,4 +51,19 @@ impl AltProvider for RpcAltProvider {
         locked.insert(address, (Instant::now(), Some(account.clone())));
         Ok(account)
     }
+}
+
+
+pub async fn load_all_alts(
+    address_lookup_table_addresses: Vec<String>,
+    alt_provider: Arc<dyn AltProvider + Send + Sync>,
+) -> Vec<AddressLookupTableAccount> {
+    let mut all_alts = vec![];
+    for alt in address_lookup_table_addresses {
+        match alt_provider.get_alt(Pubkey::from_str(&alt).unwrap()).await {
+            Ok(alt) => all_alts.push(alt),
+            Err(_) => {}
+        }
+    }
+    all_alts
 }

@@ -5,9 +5,9 @@ use axum::async_trait;
 // Import Serialize and Deserialize macros from serde.
 use serde::{Serialize, Deserialize};
 
-use crate::{routing_types::Route, server::{client_provider::ClientProvider, hash_provider::HashProvider}, swap::Swap}; // Import Swap if it exists in another module or define it below.
+use crate::{routing_types::Route, server::{alt_provider::AltProvider, client_provider::ClientProvider, hash_provider::HashProvider}, swap::Swap}; // Import Swap if it exists in another module or define it below.
 use std::str::FromStr; // Import FromStr trait for parsing strings.
-use solana_sdk::{address_lookup_table::AddressLookupTableAccount, transaction::VersionedTransaction, signer::keypair::Keypair};
+use solana_sdk::{transaction::VersionedTransaction, signer::keypair::Keypair};
 
 use super::jito_ix_sender::JitoIxSender;
 
@@ -47,10 +47,10 @@ pub trait IxSender {
     async fn send_tx(&self, transactions: HashMap<String, Vec<VersionedTransaction>>) -> anyhow::Result<()>;
 }
 
-pub fn generate_ix_sender<THashProvider>(mode: SendMode,
+pub fn generate_ix_sender<THashProvider, TAltProvider>(mode: SendMode,
     name: String,
     keypair: Keypair,
-    alt_accounts: Vec<AddressLookupTableAccount>,
+    alt_provider: Arc<TAltProvider>,
     compute_unit_price_micro_lamports: u64,
     jito_tip_bps: f32,
     jito_max_tip: u64,
@@ -60,13 +60,14 @@ pub fn generate_ix_sender<THashProvider>(mode: SendMode,
     client_provider: Arc<ClientProvider>) -> anyhow::Result<Arc<Box<dyn IxSender + Send + Sync + 'static>>> 
     where 
     THashProvider: HashProvider + Send + Sync + 'static,
+    TAltProvider: AltProvider + Send + Sync + 'static
     {
     match mode {
         SendMode::JitoBundle => {
             let sender = JitoIxSender::new(
                 name,
                 keypair,
-                alt_accounts,
+                alt_provider,
                 compute_unit_price_micro_lamports,
                 jito_tip_bps,
                 jito_max_tip,

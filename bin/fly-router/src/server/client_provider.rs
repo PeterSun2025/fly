@@ -1,6 +1,7 @@
 use std::{
     sync::{Arc, RwLock},
     net::{SocketAddr, Ipv4Addr},
+    time::Duration,
 };
 use get_if_addrs::{self, IfAddr};
 use solana_client::client_error::reqwest::{self, Client, ClientBuilder};
@@ -38,7 +39,12 @@ impl ClientProvider {
             
             let client = ClientBuilder::new()
                 .local_address(Some(local_addr.ip()))
-                .timeout(std::time::Duration::from_secs(5)) // 添加超时设置
+                // 空闲连接存活时间延长至 1 分钟（默认 30s）
+                .pool_idle_timeout(Duration::from_secs(60))
+                // 启用 TCP keep-alive（每 30s 发送心跳包）
+                .tcp_keepalive(Some(Duration::from_secs(30)))
+                // 添加超时设置
+                .timeout(Duration::from_secs(5)) 
                 .build()
                 .with_context(|| format!("Failed to build client for IP: {}", ip))?;
 

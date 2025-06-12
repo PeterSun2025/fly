@@ -6,6 +6,7 @@ use std::sync::atomic::Ordering;
 use anchor_spl::mint;
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
+use jup_ix_builder::JupSwapStepInstructionBuilder;
 use routing_types::Route;
 use server::live_account_provider::LiveAccountProvider;
 use tokio::sync::broadcast;
@@ -538,13 +539,21 @@ async fn main() -> Result<()> {
         rpc_client: build_blocking_rpc(&source_config),
     });
 
-    let ix_builder = Arc::new(SwapInstructionsBuilderImpl::new(
-        SwapStepInstructionBuilderImpl {
-            chain_data: chain_data_wrapper.clone(),
-        },
-        1 // router_version as u8,
-    ));
+    // let ix_builder = Arc::new(SwapInstructionsBuilderImpl::new(
+    //     SwapStepInstructionBuilderImpl {
+    //         chain_data: chain_data_wrapper.clone(),
+    //     },
+    //     1 // router_version as u8,
+    // ));
 
+    let sender_config = config.sender.clone();
+    let jup_url = sender_config.jupiter_url.unwrap_or_else(|| {
+        error!("No jupiter url specified, exiting..");
+        exit(-1);
+    });
+    let ix_builder = Arc::new(JupSwapStepInstructionBuilder::new(
+        jup_url,
+    ));
     
 
     let sender_executor_job = ix_sender_executor::spawn_sender_executor_job(

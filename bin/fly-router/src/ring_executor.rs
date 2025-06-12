@@ -287,7 +287,7 @@ impl RingExecutor {
             processed_count += chunk.len();
 
             // 检查超时
-            if started_at.elapsed() > Duration::from_millis(400) {
+            if started_at.elapsed() > Duration::from_millis(1000) {
                 warn!(
                     "amount calculation timeout after processing {}/{} rings in {}ms",
                     processed_count,
@@ -306,7 +306,7 @@ impl RingExecutor {
                 state.set_valid(false);
                 state.add_cooldown(&Duration::from_secs(30));
             }
-            self.state.dirty_rings.remove(&ring_id);
+            //self.state.dirty_rings.remove(&ring_id);
         }
         
 
