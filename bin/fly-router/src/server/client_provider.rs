@@ -4,7 +4,7 @@ use std::{
     time::Duration,
 };
 use get_if_addrs::{self, IfAddr};
-use solana_client::client_error::reqwest::{self, Client, ClientBuilder};
+use solana_client::client_error::reqwest::{Client, ClientBuilder};
 use tracing::{info, error};
 use anyhow::{Result, Context};
 
@@ -91,16 +91,16 @@ impl ClientProvider {
         index
     }
 
-    /// 获取当前使用的IP地址
-    pub fn get_current_ip(&self) -> &str {
-        let state = self.state.read().unwrap();
-        &self.ips[state.current_index]
-    }
+    // /// 获取当前使用的IP地址
+    // pub fn get_current_ip(&self) -> &str {
+    //     let state = self.state.read().unwrap();
+    //     &self.ips[state.current_index]
+    // }
 
-    /// 获取所有可用的客户端数量
-    pub fn client_count(&self) -> usize {
-        self.clients.len()
-    }
+    // /// 获取所有可用的客户端数量
+    // pub fn client_count(&self) -> usize {
+    //     self.clients.len()
+    // }
 
     /// 获取系统所有可用的IPv4地址
     fn get_system_ips() -> Result<Vec<String>> {

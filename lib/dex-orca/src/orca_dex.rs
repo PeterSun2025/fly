@@ -53,8 +53,8 @@ impl DexInterface for OrcaDex {
     async fn initialize(
         rpc: &mut RouterRpcClient,
         options: HashMap<String, String>,
-        take_all_mints: bool,
-        mints: &Vec<String>,
+        _: bool,
+        _: &Vec<String>,
     ) -> anyhow::Result<Arc<dyn DexInterface>>
     where
         Self: Sized,
